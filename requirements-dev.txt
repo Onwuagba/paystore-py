@@ -1,0 +1,15 @@
+# Development Dependencies
+# Generated from pyproject.toml
+# To update: poetry export -f requirements.txt --output requirements-dev.txt --with dev --without-hashes
+
+-r requirements.txt
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code Quality
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.5.0
+pre-commit>=3.5.0
