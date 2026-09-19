@@ -91,5 +91,5 @@ if result['status'] == 'success':
 
 ## Next Steps
 
-- [Authentication Guide](guides/authentication.md) - Detailed authentication methods
-- [Security Best Practices](guides/security.md) - Keep your credentials safe
+- [Authentication Guide](guides/authentication.md) - Detailed authentication methods and security best practices
+- [Tokenization Guide](guides/tokenization.md) - Save cards and charge them later

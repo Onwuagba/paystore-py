@@ -2,10 +2,20 @@
 name = "paystore"
 version = "0.1.0"
 description = "A unified Python library for integrating multiple payment providers"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Onwuagba <onwuagbakenenna@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+homepage = "https://github.com/onwuagba/paystore"
+repository = "https://github.com/onwuagba/paystore"
+documentation = "https://github.com/onwuagba/paystore/tree/main/docs"
 keywords = ["payment", "gateway", "paystack", "flutterwave", "stripe"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Office/Business :: Financial",
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
