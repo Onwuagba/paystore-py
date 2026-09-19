@@ -19,6 +19,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   the API key (Stripe, Flutterwave).
 - Test coverage for validation, tokenization, webhooks, and all three
   providers (84% overall).
+- `Gateway.payments.initialize`/`create`/`charge_authorization` now
+  validate email/amount input, persist results through an optional
+  pluggable `storage` backend, and support an `idempotency_key` on
+  `charge_authorization` to dedupe retries (protects against
+  double-charging, e.g. a cron job re-running after a network blip).
+- `AuthenticationError`, `RateLimitError`, `NetworkError` exception
+  subclasses, so callers can distinguish retryable failures from
+  permanent ones instead of catching one generic `ProviderError`.
+  `HTTPClient` now retries transient GET failures (429/5xx/network)
+  with backoff; POSTs are never auto-retried without an idempotency
+  guarantee.
+- `paystore/py.typed` (PEP 561) so downstream mypy users get type
+  checking, and `SECURITY.md` with a vulnerability-disclosure policy.
 
 ### Fixed
 - `validate_email` rejected almost all real addresses due to a literal
