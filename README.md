@@ -103,6 +103,12 @@ Notes:
   live sandbox — double-check field names/status codes for your account
   before relying on it in production.
 
+## Django
+
+For Django projects, see [paystore-django](paystore-django/) — a
+settings-based `Gateway` factory and a ready-to-subclass webhook view,
+shipped as a separate installable package in this repo.
+
 ## Documentation
 
 See the [docs](docs/) directory for full documentation.
