@@ -87,6 +87,28 @@ The library checks these variables in order:
 2. `{PROVIDER}_API_KEY` (e.g., `PAYSTACK_API_KEY`)
 3. `PAYMENT_API_KEY` (generic fallback)
 
+Webhook secrets (for providers that sign webhooks separately from the API
+key, like Stripe and Flutterwave) follow the same pattern:
+`{PROVIDER}_WEBHOOK_SECRET`, falling back to `PAYMENT_WEBHOOK_SECRET`.
+
+### Remita's Extra Credentials
+
+Remita's RRR flow needs more than an API key — it also requires
+`api_secret`, `merchant_id`, and `service_type_id`. These aren't
+auto-resolved from env vars; pass them explicitly:
+
+```python
+from paystore import Gateway
+
+gateway = Gateway(
+    provider="remita",
+    api_key=os.getenv("REMITA_API_KEY"),
+    api_secret=os.getenv("REMITA_API_SECRET"),
+    merchant_id=os.getenv("REMITA_MERCHANT_ID"),
+    service_type_id=os.getenv("REMITA_SERVICE_TYPE_ID"),
+)
+```
+
 ---
 
 ## Method 3: Django Integration
@@ -125,15 +147,15 @@ def initialize_payment(request):
         api_key=settings.PAYSTACK_SECRET_KEY,
         environment=settings.PAYMENT_ENVIRONMENT
     )
-    
+
     # Method B: Auto-detect from environment
     gateway = Gateway(provider="paystack")  # Uses PAYSTACK_SECRET_KEY
-    
+
     transaction = gateway.payments.initialize(
         amount=10000,
         email=request.user.email
     )
-    
+
     return redirect(transaction['authorization_url'])
 ```
 
@@ -146,7 +168,7 @@ from paystore import Gateway
 
 class PaymentService:
     _gateway = None
-    
+
     @classmethod
     def get_gateway(cls):
         if cls._gateway is None:
@@ -178,7 +200,7 @@ class Config:
     # Payment Configuration
     PAYMENT_PROVIDER = os.getenv('PAYMENT_PROVIDER', 'paystack')
     PAYMENT_ENVIRONMENT = os.getenv('PAYMENT_ENVIRONMENT', 'sandbox')
-    
+
     PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
     FLUTTERWAVE_SECRET_KEY = os.getenv('FLUTTERWAVE_SECRET_KEY')
 
@@ -214,7 +236,7 @@ class PaymentGateway:
         self.app = app
         if app:
             self.init_app(app)
-    
+
     def init_app(self, app):
         app.extensions = getattr(app, 'extensions', {})
         app.extensions['payment_gateway'] = Gateway(
@@ -246,7 +268,7 @@ class Settings(BaseSettings):
     payment_provider: str = "paystack"
     paystack_secret_key: str
     payment_environment: str = "sandbox"
-    
+
     class Config:
         env_file = ".env"
 

@@ -6,6 +6,7 @@ from paystore.core.exceptions import ConfigurationError
 from paystore.core.gateway import Gateway
 from paystore.providers.flutterwave.provider import FlutterwaveProvider
 from paystore.providers.paystack.provider import PaystackProvider
+from paystore.providers.remita.provider import RemitaProvider
 from paystore.providers.stripe.provider import StripeProvider
 
 
@@ -47,6 +48,17 @@ def test_gateway_resolves_provider_specific_env_key(monkeypatch):
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_from_env")
     gateway = Gateway(provider="stripe")
     assert gateway.config.api_key == "sk_test_from_env"
+
+
+def test_gateway_loads_remita_with_extra_credentials():
+    gateway = Gateway(
+        provider="remita",
+        api_key="test_key",
+        api_secret="test_secret",
+        merchant_id="MERCHANT_1",
+        service_type_id="SERVICE_1",
+    )
+    assert isinstance(gateway._provider, RemitaProvider)
 
 
 class _FakeProvider:

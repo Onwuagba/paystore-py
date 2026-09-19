@@ -5,7 +5,7 @@ switching gateways is a one-line change instead of a rewrite.
 
 ## Features
 
-- Multi-provider support: Paystack, Flutterwave, Stripe
+- Multi-provider support: Paystack, Flutterwave, Stripe, Remita
 - Swap providers by changing one string — `initialize`/`verify`/
   `charge_authorization` return a consistent shape (`reference`,
   `authorization_url`, `status`) across all of them
@@ -67,24 +67,41 @@ Switching providers is a one-line change:
 gateway = Gateway(provider="flutterwave", api_key="FLWSECK_TEST-...")
 # or
 gateway = Gateway(provider="stripe", api_key="sk_test_...")
+# Remita needs a few extra fields (see Provider Support below)
+gateway = Gateway(
+    provider="remita",
+    api_key="...",
+    api_secret="...",
+    merchant_id="...",
+    service_type_id="...",
+)
 ```
 
 ## Provider Support
 
-| Capability | Paystack | Flutterwave | Stripe |
-|---|---|---|---|
-| Initialize / verify payment | ✅ | ✅ | ✅ |
-| Charge saved card (`charge_authorization`) | ✅ | ✅ | ✅ |
-| Webhook signature verification | ✅ | ✅ | ✅ |
-| Customer management (`gateway.customers`) | ✅ | ❌ | ✅ |
-| List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ |
+| Capability | Paystack | Flutterwave | Stripe | Remita |
+|---|---|---|---|---|
+| Initialize / verify payment | ✅ | ✅ | ✅ | ✅ |
+| Charge saved card (`charge_authorization`) | ✅ | ✅ | ✅ | ❌ |
+| Webhook signature verification | ✅ | ✅ | ✅ | ✅ |
+| Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ |
+| List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ |
 
-Flutterwave has no first-class "saved customer" API comparable to
-Paystack's or Stripe's, so `gateway.customers` and `gateway.tokens`
-raise `NotImplementedError` for that provider; recurring charges still
-work via `charge_authorization` using the card token from a verified
-transaction. Stripe does not support NGN — pass a currency it supports
-(e.g. `currency="USD"`).
+Notes:
+- Flutterwave has no first-class "saved customer" API comparable to
+  Paystack's or Stripe's, so `gateway.customers` and `gateway.tokens`
+  raise `NotImplementedError` for that provider; recurring charges still
+  work via `charge_authorization` using the card token from a verified
+  transaction.
+- Stripe does not support NGN — pass a currency it supports (e.g.
+  `currency="USD"`).
+- Remita uses an RRR (Remita Retrieval Reference) flow instead of
+  charge-by-token, so `charge_authorization` and customer management
+  aren't implemented for it; it also requires `api_secret`,
+  `merchant_id`, and `service_type_id` in addition to `api_key`. It was
+  implemented from Remita's published docs but not verified against a
+  live sandbox — double-check field names/status codes for your account
+  before relying on it in production.
 
 ## Documentation
 

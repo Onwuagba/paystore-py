@@ -20,6 +20,20 @@ class Config(BaseModel):
             "(e.g. Stripe's whsec_..., Flutterwave's dashboard secret hash)."
         ),
     )
+    api_secret: Optional[str] = Field(
+        default=None,
+        description=(
+            "Secondary secret some providers use alongside api_key "
+            "(e.g. Remita's request-signing secret)."
+        ),
+    )
+    merchant_id: Optional[str] = Field(
+        default=None, description="Merchant/business id (required by Remita)."
+    )
+    service_type_id: Optional[str] = Field(
+        default=None,
+        description="Service type id for the transaction (required by Remita).",
+    )
 
     @field_validator("environment")
     @classmethod

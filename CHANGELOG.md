@@ -6,8 +6,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Flutterwave and Stripe providers, so `Gateway(provider=...)` can target
-  Paystack, Flutterwave, or Stripe interchangeably.
+- Flutterwave, Stripe, and Remita providers, so `Gateway(provider=...)` can
+  target Paystack, Flutterwave, Stripe, or Remita interchangeably.
+- `Config.api_secret`/`merchant_id`/`service_type_id` for Remita's RRR-based
+  auth scheme (a single `api_key` isn't enough for it).
 - Tokenization/customer-management support: `charge_authorization`, customer
   CRUD, and saved-card listing, plus a `TokenManager` helper.
 - `Config.webhook_secret` for providers that sign webhooks separately from
