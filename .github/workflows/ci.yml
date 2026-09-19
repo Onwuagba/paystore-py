@@ -3,6 +3,25 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+    - name: Install Poetry
+      run: pip install poetry
+    - name: Install dependencies
+      run: poetry install
+    - name: Check formatting
+      run: poetry run black --check .
+    - name: Lint
+      run: poetry run ruff check .
+    - name: Type check
+      run: poetry run mypy paystore
+
   test:
     runs-on: ubuntu-latest
     strategy:

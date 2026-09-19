@@ -5,12 +5,13 @@ Basic usage example showing different authentication methods.
 Before running:
     # Method 1: Set environment variable
     export PAYSTACK_SECRET_KEY=sk_test_your_key
-    
+
     # Method 2: Create .env file
     echo "PAYSTACK_SECRET_KEY=sk_test_your_key" > .env
 """
 
 import os
+
 from paystore.core.gateway import Gateway
 
 
@@ -23,7 +24,7 @@ def example_direct_credentials():
     gateway = Gateway(
         provider="paystack",
         api_key="sk_test_demo_key",  # Replace with your key
-        environment="sandbox"
+        environment="sandbox",
     )
 
     print("✓ Gateway initialized with direct credentials")
@@ -37,7 +38,7 @@ def example_environment_variables():
     print("=" * 60)
 
     # The library automatically loads from PAYSTACK_SECRET_KEY
-    if os.getenv('PAYSTACK_SECRET_KEY'):
+    if os.getenv("PAYSTACK_SECRET_KEY"):
         gateway = Gateway(provider="paystack")
         print("✓ Gateway initialized from PAYSTACK_SECRET_KEY")
         return gateway
@@ -55,9 +56,10 @@ def example_dotenv():
 
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
 
-        if os.getenv('PAYSTACK_SECRET_KEY'):
+        if os.getenv("PAYSTACK_SECRET_KEY"):
             gateway = Gateway(provider="paystack")
             print("✓ Gateway initialized from .env file")
             return gateway
@@ -82,17 +84,13 @@ def example_initialize_payment(gateway):
             amount=50000,  # ₦500.00 (in kobo)
             email="customer@example.com",
             currency="NGN",
-            metadata={
-                "order_id": "12345",
-                "customer_name": "John Doe"
-            }
+            metadata={"order_id": "12345", "customer_name": "John Doe"},
         )
 
-        print(f"✓ Payment initialized successfully!")
+        print("✓ Payment initialized successfully!")
         print(f"  Reference: {transaction.get('reference')}")
-        print(
-            f"  Payment URL: {transaction.get('authorization_url')}")
-        print(f"\n  Customer should visit the URL to complete payment")
+        print(f"  Payment URL: {transaction.get('authorization_url')}")
+        print("\n  Customer should visit the URL to complete payment")
 
         return transaction
 
@@ -114,7 +112,7 @@ def example_verify_payment(gateway, reference):
         print(f"  Amount: ₦{result.get('amount', 0) / 100:.2f}")
         print(f"  Reference: {result.get('reference')}")
 
-        if result.get('status') == 'success':
+        if result.get("status") == "success":
             print("\n✓ Payment successful!")
         else:
             print(f"\n⚠ Payment status: {result.get('status')}")
@@ -130,8 +128,7 @@ def main():
     """Run all examples."""
     print("\n")
     print("╔" + "=" * 58 + "╗")
-    print("║" + " " * 10 +
-          "Payment Aggregator - Basic Examples" + " " * 13 + "║")
+    print("║" + " " * 10 + "Payment Aggregator - Basic Examples" + " " * 13 + "║")
     print("╚" + "=" * 58 + "╝")
 
     # Try different authentication methods
@@ -156,8 +153,7 @@ def main():
         print("\n" + "=" * 60)
         print("DEMO: Payment Operations")
         print("=" * 60)
-        print(
-            "\nNote: This is a demo. Actual payment requires valid credentials.")
+        print("\nNote: This is a demo. Actual payment requires valid credentials.")
         print("Update the api_key with your test key to try real payments.")
 
         # Uncomment these lines with valid credentials to test
@@ -175,8 +171,7 @@ def main():
         print("   export PAYSTACK_SECRET_KEY=sk_test_your_key")
         print("\n2. Create .env file:")
         print("   echo 'PAYSTACK_SECRET_KEY=sk_test_your_key' > .env")
-        print(
-            "\n3. Edit this file and add your key to example_direct_credentials()")
+        print("\n3. Edit this file and add your key to example_direct_credentials()")
 
     print("\n" + "=" * 60)
     print("Example completed!")
