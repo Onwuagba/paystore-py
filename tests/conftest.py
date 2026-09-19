@@ -1,6 +1,7 @@
 """Pytest configuration."""
 
 import pytest
+
 from paystore.core.config import Config
 
 

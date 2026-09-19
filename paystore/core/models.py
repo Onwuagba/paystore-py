@@ -1,12 +1,13 @@
 """Data models."""
 
 from typing import Optional
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 
 
 class Transaction(BaseModel):
     """Payment transaction model."""
-    
+
     reference: str
     amount: int
     currency: str = "NGN"

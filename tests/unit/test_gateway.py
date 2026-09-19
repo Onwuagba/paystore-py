@@ -1,8 +1,9 @@
 """Tests for Gateway class."""
 
 import pytest
-from paystore.core.gateway import Gateway
+
 from paystore.core.exceptions import ConfigurationError
+from paystore.core.gateway import Gateway
 
 
 def test_gateway_initialization():
