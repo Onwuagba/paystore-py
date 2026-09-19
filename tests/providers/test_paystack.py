@@ -5,7 +5,7 @@ import hmac
 
 import pytest
 
-from paystore.core.exceptions import ProviderError
+from paystore.core.exceptions import AuthenticationError, ProviderError
 from paystore.providers.paystack.provider import PaystackProvider
 
 
@@ -160,6 +160,17 @@ def test_list_customer_authorizations(provider, monkeypatch):
     )
     result = provider.list_customer_authorizations("CUS_1")
     assert result == [{"authorization_code": "AUTH_1"}]
+
+
+def test_initialize_payment_passes_through_specific_exception_type(
+    provider, monkeypatch
+):
+    def raise_auth_error(url, data, headers):
+        raise AuthenticationError("bad key")
+
+    monkeypatch.setattr(provider.client, "post", raise_auth_error)
+    with pytest.raises(AuthenticationError):
+        provider.initialize_payment(amount=1000, email="a@example.com")
 
 
 def test_verify_webhook_signature_valid(provider):

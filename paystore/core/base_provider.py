@@ -36,9 +36,19 @@ class BaseProvider(ABC):
         email: str,
         amount: int,
         currency: str = "NGN",
+        idempotency_key: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Charge a tokenized payment method."""
+        """
+        Charge a tokenized payment method.
+
+        idempotency_key: if the provider supports native idempotency
+        (currently only Stripe), passed through as a header so retrying
+        with the same key is safe against duplicate charges even across
+        processes. Providers without native support should accept and
+        ignore it — Gateway.payments.charge_authorization still dedupes
+        by this key for the lifetime of the Gateway instance.
+        """
         pass
 
     def create_customer(

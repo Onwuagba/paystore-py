@@ -85,6 +85,40 @@ def test_charge_authorization_normalizes_status(provider, monkeypatch):
     assert result["status"] == "success"
 
 
+def test_charge_authorization_sends_idempotency_key_header(provider, monkeypatch):
+    captured_headers = {}
+
+    def fake_post_form(url, data, headers):
+        captured_headers.update(headers)
+        return {"id": "pi_1", "status": "succeeded"}
+
+    monkeypatch.setattr(provider.client, "post_form", fake_post_form)
+    provider.charge_authorization(
+        authorization_code="pm_1",
+        email="a@example.com",
+        amount=500,
+        currency="usd",
+        idempotency_key="order-1",
+    )
+    assert captured_headers["Idempotency-Key"] == "order-1"
+
+
+def test_charge_authorization_omits_idempotency_header_when_not_given(
+    provider, monkeypatch
+):
+    captured_headers = {}
+
+    def fake_post_form(url, data, headers):
+        captured_headers.update(headers)
+        return {"id": "pi_1", "status": "succeeded"}
+
+    monkeypatch.setattr(provider.client, "post_form", fake_post_form)
+    provider.charge_authorization(
+        authorization_code="pm_1", email="a@example.com", amount=500, currency="usd"
+    )
+    assert "Idempotency-Key" not in captured_headers
+
+
 def test_create_customer_maps_id_to_customer_code(provider, monkeypatch):
     monkeypatch.setattr(
         provider.client,

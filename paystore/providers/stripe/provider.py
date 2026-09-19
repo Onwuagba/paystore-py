@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from paystore.core.base_provider import BaseProvider
-from paystore.core.exceptions import ConfigurationError, ProviderError
+from paystore.core.exceptions import ConfigurationError, PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
 
 _STATUS_MAP = {
@@ -69,10 +69,18 @@ class StripeProvider(BaseProvider):
     def _get_headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.config.api_key}"}
 
-    def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _post(
+        self,
+        path: str,
+        payload: Dict[str, Any],
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
         url = f"{self.BASE_URL}/{path}"
+        headers = self._get_headers()
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
         response = self.client.post_form(
-            url, data=_flatten_params(payload), headers=self._get_headers()
+            url, data=_flatten_params(payload), headers=headers
         )
         if "error" in response:
             raise ProviderError(response["error"].get("message", "Stripe API error"))
@@ -125,7 +133,7 @@ class StripeProvider(BaseProvider):
                 "authorization_url": data.get("url"),
                 "access_code": data.get("id"),
             }
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to initialize payment: {e}") from e
@@ -139,7 +147,7 @@ class StripeProvider(BaseProvider):
                 "reference": data.get("id", reference),
                 "status": self._normalize_status(data.get("payment_status")),
             }
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to verify payment: {e}") from e
@@ -150,9 +158,17 @@ class StripeProvider(BaseProvider):
         email: str,
         amount: int,
         currency: str = "NGN",
+        idempotency_key: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Charge a saved PaymentMethod off-session via a PaymentIntent."""
+        """
+        Charge a saved PaymentMethod off-session via a PaymentIntent.
+
+        idempotency_key, if given, is sent as Stripe's native
+        `Idempotency-Key` header — Stripe itself will return the original
+        result for a retried request with the same key, rather than
+        creating a second PaymentIntent.
+        """
         payload = {
             "amount": amount,
             "currency": currency.lower(),
@@ -164,13 +180,15 @@ class StripeProvider(BaseProvider):
         }
 
         try:
-            data = self._post("payment_intents", payload)
+            data = self._post(
+                "payment_intents", payload, idempotency_key=idempotency_key
+            )
             return {
                 **data,
                 "reference": data.get("id"),
                 "status": self._normalize_status(data.get("status")),
             }
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to charge authorization: {e}") from e
@@ -190,7 +208,7 @@ class StripeProvider(BaseProvider):
         try:
             data = self._post("customers", payload)
             return {**data, "customer_code": data.get("id")}
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to create customer: {e}") from e
@@ -200,7 +218,7 @@ class StripeProvider(BaseProvider):
         try:
             data = self._get(f"customers/{customer_code}")
             return {**data, "customer_code": data.get("id")}
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to get customer: {e}") from e
@@ -210,7 +228,7 @@ class StripeProvider(BaseProvider):
         try:
             data = self._post(f"customers/{customer_code}", kwargs)
             return {**data, "customer_code": data.get("id")}
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to update customer: {e}") from e
@@ -234,7 +252,7 @@ class StripeProvider(BaseProvider):
                     }
                 )
             return authorizations
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to list authorizations: {e}") from e
@@ -244,7 +262,7 @@ class StripeProvider(BaseProvider):
         try:
             data = self._post(f"payment_methods/{authorization_code}/detach", {})
             return {"success": True, **data}
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to deactivate authorization: {e}") from e

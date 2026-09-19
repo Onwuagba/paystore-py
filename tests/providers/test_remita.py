@@ -5,7 +5,11 @@ import hashlib
 import pytest
 
 from paystore.core.config import Config
-from paystore.core.exceptions import ConfigurationError, ProviderError
+from paystore.core.exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    ProviderError,
+)
 from paystore.providers.remita.provider import RemitaProvider
 
 
@@ -75,6 +79,15 @@ def test_verify_payment_failed_status(provider, monkeypatch):
     )
     result = provider.verify_payment("290000000000")
     assert result["status"] == "failed"
+
+
+def test_verify_payment_passes_through_specific_exception_type(provider, monkeypatch):
+    def raise_auth_error(url, headers):
+        raise AuthenticationError("bad key")
+
+    monkeypatch.setattr(provider.client, "get", raise_auth_error)
+    with pytest.raises(AuthenticationError):
+        provider.verify_payment("290000000000")
 
 
 def test_charge_authorization_not_implemented(provider):

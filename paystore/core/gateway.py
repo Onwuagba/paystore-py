@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 from paystore.core.base_provider import BaseProvider
 from paystore.core.config import Config
 from paystore.core.exceptions import ConfigurationError
+from paystore.security.validation import validate_amount, validate_email
+from paystore.storage.base import BaseStorage, NoOpStorage
 
 
 class Gateway:
@@ -38,6 +40,7 @@ class Gateway:
         api_key: Optional[str] = None,
         environment: str = "sandbox",
         config: Optional[Config] = None,
+        storage: Optional[BaseStorage] = None,
         **kwargs: Any,
     ):
         """
@@ -48,6 +51,9 @@ class Gateway:
             api_key: Provider API key (or set via environment variable)
             environment: "sandbox" or "production"
             config: Pre-configured Config object (overrides other params)
+            storage: Optional BaseStorage backend to persist transaction
+                results from initialize/verify/charge_authorization
+                (defaults to NoOpStorage, which does nothing)
             **kwargs: Additional configuration options
 
         Environment variables checked (in order):
@@ -96,6 +102,8 @@ class Gateway:
                 **kwargs,
             )
 
+        self.storage = storage or NoOpStorage()
+        self._idempotency_cache: Dict[str, Dict[str, Any]] = {}
         self._provider = self._load_provider()
 
     def _resolve_api_key(self, provider: Optional[str], api_key: Optional[str]) -> str:
@@ -171,7 +179,7 @@ class Gateway:
     @property
     def payments(self) -> "PaymentOperations":
         """Access payment operations."""
-        return PaymentOperations(self._provider)
+        return PaymentOperations(self._provider, self.storage, self._idempotency_cache)
 
     @property
     def customers(self) -> "CustomerOperations":
@@ -209,6 +217,7 @@ class CustomerOperations:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Create a customer profile."""
+        validate_email(email)
         return self._provider.create_customer(
             email=email,
             first_name=first_name,
@@ -244,20 +253,35 @@ class TokenOperations:
 class PaymentOperations:
     """Payment operation handlers."""
 
-    def __init__(self, provider: BaseProvider):
+    def __init__(
+        self,
+        provider: BaseProvider,
+        storage: Optional[BaseStorage] = None,
+        idempotency_cache: Optional[Dict[str, Dict[str, Any]]] = None,
+    ):
         self._provider = provider
+        self._storage = storage or NoOpStorage()
+        self._idempotency_cache = (
+            idempotency_cache if idempotency_cache is not None else {}
+        )
 
     def initialize(
         self, amount: int, email: str, currency: str = "NGN", **kwargs: Any
     ) -> Dict[str, Any]:
         """Initialize a payment transaction."""
-        return self._provider.initialize_payment(
+        validate_amount(amount)
+        validate_email(email)
+        result = self._provider.initialize_payment(
             amount=amount, email=email, currency=currency, **kwargs
         )
+        self._storage.save_transaction(result)
+        return result
 
     def verify(self, reference: str) -> Dict[str, Any]:
         """Verify a payment transaction."""
-        return self._provider.verify_payment(reference)
+        result = self._provider.verify_payment(reference)
+        self._storage.save_transaction(result)
+        return result
 
     def charge_authorization(
         self,
@@ -265,6 +289,7 @@ class PaymentOperations:
         email: str,
         amount: int,
         currency: str = "NGN",
+        idempotency_key: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """
@@ -275,15 +300,33 @@ class PaymentOperations:
             email: Customer email
             amount: Amount to charge (in smallest currency unit)
             currency: Currency code
+            idempotency_key: Optional caller-supplied key. If a charge
+                with this key already succeeded on this Gateway instance,
+                the cached result is returned instead of charging again —
+                protects against double-charging on retry (e.g. a cron
+                job re-running after a network blip). Also forwarded to
+                the provider natively when it supports it (Stripe).
             **kwargs: Additional provider-specific parameters
 
         Returns:
             Transaction details
         """
-        return self._provider.charge_authorization(
+        validate_amount(amount)
+        validate_email(email)
+
+        if idempotency_key and idempotency_key in self._idempotency_cache:
+            return self._idempotency_cache[idempotency_key]
+
+        result = self._provider.charge_authorization(
             authorization_code=authorization_code,
             email=email,
             amount=amount,
             currency=currency,
+            idempotency_key=idempotency_key,
             **kwargs,
         )
+
+        if idempotency_key:
+            self._idempotency_cache[idempotency_key] = result
+        self._storage.save_transaction(result)
+        return result

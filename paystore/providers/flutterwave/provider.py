@@ -1,10 +1,10 @@
 """Flutterwave provider implementation."""
 
 import hmac
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from paystore.core.base_provider import BaseProvider
-from paystore.core.exceptions import ConfigurationError, ProviderError
+from paystore.core.exceptions import ConfigurationError, PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
 from paystore.utils.helpers import generate_reference
 
@@ -75,7 +75,7 @@ class FlutterwaveProvider(BaseProvider):
                     "access_code": None,
                 }
             raise ProviderError(response.get("message", "Unknown error"))
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to initialize payment: {e}") from e
@@ -96,7 +96,7 @@ class FlutterwaveProvider(BaseProvider):
                     "status": self._normalize_status(data.get("status")),
                 }
             raise ProviderError(response.get("message", "Verification failed"))
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to verify payment: {e}") from e
@@ -107,9 +107,17 @@ class FlutterwaveProvider(BaseProvider):
         email: str,
         amount: int,
         currency: str = "NGN",
+        idempotency_key: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Charge a saved card token via Flutterwave's tokenized-charges endpoint."""
+        """
+        Charge a saved card token via Flutterwave's tokenized-charges endpoint.
+
+        Flutterwave has no documented native idempotency-key support, so
+        idempotency_key is accepted for interface consistency but not
+        sent — Gateway.payments.charge_authorization still dedupes
+        retries by this key at the client level.
+        """
         url = f"{self.BASE_URL}/tokenized-charges"
         tx_ref = kwargs.pop("reference", None) or generate_reference()
 
@@ -132,7 +140,7 @@ class FlutterwaveProvider(BaseProvider):
                     "status": self._normalize_status(data.get("status")),
                 }
             raise ProviderError(response.get("message", "Charge failed"))
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to charge authorization: {e}") from e

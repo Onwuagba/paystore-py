@@ -2,12 +2,13 @@
 
 import pytest
 
-from paystore.core.exceptions import ConfigurationError, PaymentError
+from paystore.core.exceptions import ConfigurationError, PaymentError, ValidationError
 from paystore.core.gateway import Gateway
 from paystore.providers.flutterwave.provider import FlutterwaveProvider
 from paystore.providers.paystack.provider import PaystackProvider
 from paystore.providers.remita.provider import RemitaProvider
 from paystore.providers.stripe.provider import StripeProvider
+from paystore.storage.base import BaseStorage
 
 
 def test_gateway_initialization():
@@ -157,3 +158,100 @@ def test_verify_webhook_raises_for_invalid_signature(gateway_with_fake_provider)
     gateway, _ = gateway_with_fake_provider
     with pytest.raises(PaymentError):
         gateway.verify_webhook(b"payload", "bad-signature")
+
+
+def test_initialize_rejects_invalid_email(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.payments.initialize(amount=1000, email="not-an-email")
+    assert fake.calls == []
+
+
+def test_initialize_rejects_non_positive_amount(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.payments.initialize(amount=0, email="a@example.com")
+    assert fake.calls == []
+
+
+def test_charge_authorization_rejects_invalid_input(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.payments.charge_authorization(
+            authorization_code="AUTH_1", email="a@example.com", amount=-5
+        )
+    assert fake.calls == []
+
+
+def test_customers_create_rejects_invalid_email(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.customers.create(email="not-an-email")
+    assert fake.calls == []
+
+
+def test_charge_authorization_idempotency_key_dedupes_within_gateway(
+    gateway_with_fake_provider,
+):
+    gateway, fake = gateway_with_fake_provider
+    first = gateway.payments.charge_authorization(
+        authorization_code="AUTH_1",
+        email="a@example.com",
+        amount=500,
+        idempotency_key="order-42",
+    )
+    second = gateway.payments.charge_authorization(
+        authorization_code="AUTH_1",
+        email="a@example.com",
+        amount=500,
+        idempotency_key="order-42",
+    )
+    assert first == second
+    assert len(fake.calls) == 1
+
+
+def test_charge_authorization_without_idempotency_key_always_calls_provider(
+    gateway_with_fake_provider,
+):
+    gateway, fake = gateway_with_fake_provider
+    gateway.payments.charge_authorization(
+        authorization_code="AUTH_1", email="a@example.com", amount=500
+    )
+    gateway.payments.charge_authorization(
+        authorization_code="AUTH_1", email="a@example.com", amount=500
+    )
+    assert len(fake.calls) == 2
+
+
+class _FakeStorage(BaseStorage):
+    def __init__(self):
+        self.saved = []
+
+    def save_transaction(self, transaction):
+        self.saved.append(transaction)
+
+
+def test_gateway_saves_transactions_through_storage():
+    fake_storage = _FakeStorage()
+    gateway = Gateway(provider="paystack", api_key="sk_test_key", storage=fake_storage)
+    fake_provider = _FakeProvider()
+    gateway._provider = fake_provider
+
+    gateway.payments.initialize(amount=1000, email="a@example.com")
+    gateway.payments.verify("TXN_1")
+    gateway.payments.charge_authorization(
+        authorization_code="AUTH_1", email="a@example.com", amount=500
+    )
+
+    assert fake_storage.saved == [
+        {"reference": "TXN_1"},
+        {"status": "success"},
+        {"status": "success"},
+    ]
+
+
+def test_gateway_defaults_to_noop_storage():
+    gateway = Gateway(provider="paystack", api_key="sk_test_key")
+    gateway._provider = _FakeProvider()
+    # Should not raise even though nothing was passed for `storage`.
+    gateway.payments.verify("TXN_1")

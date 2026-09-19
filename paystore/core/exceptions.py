@@ -13,6 +13,24 @@ class ProviderError(PaymentError):
     pass
 
 
+class AuthenticationError(ProviderError):
+    """Raised when the provider rejects the API key/credentials (401/403)."""
+
+    pass
+
+
+class RateLimitError(ProviderError):
+    """Raised when the provider throttles requests (429)."""
+
+    pass
+
+
+class NetworkError(ProviderError):
+    """Raised for connection failures, timeouts, or other transport errors."""
+
+    pass
+
+
 class ConfigurationError(PaymentError):
     """Exception for configuration errors."""
 

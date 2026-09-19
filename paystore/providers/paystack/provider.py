@@ -5,7 +5,7 @@ import hmac
 from typing import Any, Dict, List, Optional
 
 from paystore.core.base_provider import BaseProvider
-from paystore.core.exceptions import ProviderError
+from paystore.core.exceptions import PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
 
 
@@ -36,6 +36,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return response.get("data", {})
             raise ProviderError(response.get("message", "Unknown error"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to initialize payment: {e}") from e
 
@@ -48,6 +50,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return response.get("data", {})
             raise ProviderError(response.get("message", "Verification failed"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to verify payment: {e}") from e
 
@@ -57,9 +61,17 @@ class PaystackProvider(BaseProvider):
         email: str,
         amount: int,
         currency: str = "NGN",
+        idempotency_key: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Charge a tokenized card using authorization code."""
+        """
+        Charge a tokenized card using authorization code.
+
+        Paystack's API has no documented native idempotency-key support,
+        so idempotency_key is accepted for interface consistency but not
+        sent to Paystack — Gateway.payments.charge_authorization still
+        dedupes retries by this key at the client level.
+        """
         url = f"{self.BASE_URL}/transaction/charge_authorization"
 
         payload = {
@@ -75,6 +87,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return response.get("data", {})
             raise ProviderError(response.get("message", "Charge failed"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to charge authorization: {e}") from e
 
@@ -103,6 +117,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return response.get("data", {})
             raise ProviderError(response.get("message", "Customer creation failed"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to create customer: {e}") from e
 
@@ -115,6 +131,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return response.get("data", {})
             raise ProviderError(response.get("message", "Customer not found"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to get customer: {e}") from e
 
@@ -127,6 +145,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return response.get("data", {})
             raise ProviderError(response.get("message", "Update failed"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to update customer: {e}") from e
 
@@ -142,6 +162,8 @@ class PaystackProvider(BaseProvider):
             raise ProviderError(
                 response.get("message", "Failed to list authorizations")
             )
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to list authorizations: {e}") from e
 
@@ -156,6 +178,8 @@ class PaystackProvider(BaseProvider):
             if response.get("status"):
                 return {"success": True, "message": response.get("message")}
             raise ProviderError(response.get("message", "Deactivation failed"))
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to deactivate authorization: {e}") from e
 

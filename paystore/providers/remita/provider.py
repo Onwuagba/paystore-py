@@ -14,10 +14,10 @@ for your merchant account before relying on this in production.
 
 import hashlib
 import hmac
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from paystore.core.base_provider import BaseProvider
-from paystore.core.exceptions import ConfigurationError, ProviderError
+from paystore.core.exceptions import ConfigurationError, PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
 from paystore.utils.helpers import generate_reference
 
@@ -126,7 +126,7 @@ class RemitaProvider(BaseProvider):
                 "authorization_url": self.payment_url_template.format(rrr=rrr),
                 "access_code": rrr,
             }
-        except ProviderError:
+        except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to initialize payment: {e}") from e
@@ -155,6 +155,8 @@ class RemitaProvider(BaseProvider):
                 if status_code in _SUCCESS_STATUS_CODES
                 else "failed",
             }
+        except PaymentError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to verify payment: {e}") from e
 
@@ -164,6 +166,7 @@ class RemitaProvider(BaseProvider):
         email: str,
         amount: int,
         currency: str = "NGN",
+        idempotency_key: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Not supported: Remita recurring payments use a separate mandate API."""
