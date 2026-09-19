@@ -9,6 +9,7 @@ homepage = "https://github.com/onwuagba/paystore"
 repository = "https://github.com/onwuagba/paystore"
 documentation = "https://github.com/onwuagba/paystore/tree/main/docs"
 keywords = ["payment", "gateway", "paystack", "flutterwave", "stripe"]
+include = ["paystore/py.typed"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
