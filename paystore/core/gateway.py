@@ -183,6 +183,16 @@ class Gateway:
         """Access tokenization operations."""
         return TokenOperations(self._provider)
 
+    def verify_webhook(self, payload: bytes, signature: str) -> bool:
+        """
+        Verify a webhook signature for this gateway's provider.
+
+        Raises PaymentError if the signature is invalid.
+        """
+        from paystore.webhooks.verifier import WebhookVerifier
+
+        return WebhookVerifier(self._provider).verify(payload, signature)
+
 
 class CustomerOperations:
     """Customer management operations."""

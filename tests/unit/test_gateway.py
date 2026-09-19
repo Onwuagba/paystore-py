@@ -2,7 +2,7 @@
 
 import pytest
 
-from paystore.core.exceptions import ConfigurationError
+from paystore.core.exceptions import ConfigurationError, PaymentError
 from paystore.core.gateway import Gateway
 from paystore.providers.flutterwave.provider import FlutterwaveProvider
 from paystore.providers.paystack.provider import PaystackProvider
@@ -99,6 +99,10 @@ class _FakeProvider:
         self.calls.append(("deactivate_authorization", authorization_code))
         return {"success": True}
 
+    def verify_webhook_signature(self, payload, signature):
+        self.calls.append(("verify_webhook_signature", (payload, signature)))
+        return signature == "valid-signature"
+
 
 @pytest.fixture
 def gateway_with_fake_provider(monkeypatch):
@@ -142,3 +146,14 @@ def test_tokens_facade_delegates_to_provider(gateway_with_fake_provider):
         "list_customer_authorizations",
         "deactivate_authorization",
     ]
+
+
+def test_verify_webhook_returns_true_for_valid_signature(gateway_with_fake_provider):
+    gateway, _ = gateway_with_fake_provider
+    assert gateway.verify_webhook(b"payload", "valid-signature") is True
+
+
+def test_verify_webhook_raises_for_invalid_signature(gateway_with_fake_provider):
+    gateway, _ = gateway_with_fake_provider
+    with pytest.raises(PaymentError):
+        gateway.verify_webhook(b"payload", "bad-signature")
