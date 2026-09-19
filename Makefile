@@ -50,5 +50,8 @@ publish:  ## Publish to PyPI
 run-example:  ## Run basic example
 	poetry run python examples/basic_usage.py
 
+smoke-test:  ## Test against real provider sandboxes (needs *_SECRET_KEY env vars)
+	poetry run python scripts/smoke_test.py
+
 pre-commit:  ## Run pre-commit on all files
 	poetry run pre-commit run --all-files

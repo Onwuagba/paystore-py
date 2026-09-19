@@ -11,6 +11,26 @@ Thank you for contributing!
 5. Run tests: `poetry run pytest`
 6. Submit a pull request
 
+## Smoke testing against real sandboxes
+
+`pytest` never makes real network calls — everything is mocked. Before a
+release, run `scripts/smoke_test.py` with real sandbox credentials to
+catch anything the mocks can't (wrong field names, wrong URLs, wrong
+status codes against a provider's actual API):
+
+```bash
+export PAYSTACK_SECRET_KEY=sk_test_...
+export FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST-...
+export STRIPE_SECRET_KEY=sk_test_...
+export REMITA_SECRET_KEY=...  # plus REMITA_API_SECRET/MERCHANT_ID/SERVICE_TYPE_ID
+
+python scripts/smoke_test.py
+```
+
+Only providers with credentials set are tested; the rest are skipped.
+It never moves money (no `charge_authorization` call) and refuses to
+run against anything that looks like a live key.
+
 ## Code Style
 
 - Use Black for formatting
