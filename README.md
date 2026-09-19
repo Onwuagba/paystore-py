@@ -15,6 +15,11 @@ switching gateways is a one-line change instead of a rewrite.
 - Webhook signature verification per provider
 - Credentials resolved from explicit args, env vars, or framework
   settings (see [docs/guides/authentication.md](docs/guides/authentication.md))
+- `idempotency_key` on `charge_authorization` to safely retry a charge
+  without double-charging; input validation and richer exceptions
+  (`AuthenticationError`, `RateLimitError`, `NetworkError`) so callers
+  can tell retryable failures from permanent ones
+- `AsyncGateway` for FastAPI/async Django (see [Async usage](#async-usage))
 
 ## Installation
 
@@ -102,6 +107,31 @@ Notes:
   implemented from Remita's published docs but not verified against a
   live sandbox — double-check field names/status codes for your account
   before relying on it in production.
+
+## Async usage
+
+`AsyncGateway` wraps `Gateway` for use in FastAPI or async Django views.
+It runs calls in a thread pool rather than making native non-blocking
+HTTP requests (paystore's providers use a synchronous `httpx.Client`),
+so it keeps your event loop unblocked without duplicating every
+provider as async:
+
+```python
+from paystore import AsyncGateway
+
+gateway = AsyncGateway(provider="paystack", api_key="sk_test_...")
+
+@app.post("/pay")
+async def pay():
+    transaction = await gateway.initialize_payment(10000, "customer@example.com")
+    return {"url": transaction["authorization_url"]}
+```
+
+It mirrors `Gateway`'s methods directly (`initialize_payment`,
+`verify_payment`, `charge_authorization`, `create_customer`,
+`get_customer`, `update_customer`, `list_tokens`, `deactivate_token`,
+`verify_webhook`) rather than the `.payments`/`.customers`/`.tokens`
+facade.
 
 ## Django
 

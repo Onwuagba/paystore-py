@@ -32,6 +32,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   guarantee.
 - `paystore/py.typed` (PEP 561) so downstream mypy users get type
   checking, and `SECURITY.md` with a vulnerability-disclosure policy.
+- `AsyncGateway`: a thread-pool-backed async wrapper around `Gateway` for
+  FastAPI/async Django, without a full async rewrite of every provider.
 
 ### Fixed
 - `validate_email` rejected almost all real addresses due to a literal
