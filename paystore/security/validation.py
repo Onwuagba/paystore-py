@@ -7,9 +7,9 @@ from paystore.core.exceptions import ValidationError
 
 def validate_email(email: str) -> bool:
     """Validate email address."""
-    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{{2,}}$"
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(pattern, email):
-        raise ValidationError("Invalid email: {email}")
+        raise ValidationError(f"Invalid email: {email}")
     return True
 
 

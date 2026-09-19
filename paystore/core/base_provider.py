@@ -51,29 +51,29 @@ class BaseProvider(ABC):
     ) -> Dict[str, Any]:
         """Create a customer profile (optional implementation)."""
         raise NotImplementedError(
-            "{self.__class__.__name__} does not support customer creation"
+            f"{self.__class__.__name__} does not support customer creation"
         )
 
     def get_customer(self, customer_code: str) -> Dict[str, Any]:
         """Get customer details (optional implementation)."""
         raise NotImplementedError(
-            "{self.__class__.__name__} does not support customer retrieval"
+            f"{self.__class__.__name__} does not support customer retrieval"
         )
 
     def update_customer(self, customer_code: str, **kwargs: Any) -> Dict[str, Any]:
         """Update customer details (optional implementation)."""
         raise NotImplementedError(
-            "{self.__class__.__name__} does not support customer updates"
+            f"{self.__class__.__name__} does not support customer updates"
         )
 
     def list_customer_authorizations(self, customer_code: str) -> List[Dict[str, Any]]:
         """List payment tokens for customer (optional implementation)."""
         raise NotImplementedError(
-            "{self.__class__.__name__} does not support listing authorizations"
+            f"{self.__class__.__name__} does not support listing authorizations"
         )
 
     def deactivate_authorization(self, authorization_code: str) -> Dict[str, Any]:
         """Deactivate a payment token (optional implementation)."""
         raise NotImplementedError(
-            "{self.__class__.__name__} does not support deactivating authorizations"
+            f"{self.__class__.__name__} does not support deactivating authorizations"
         )
