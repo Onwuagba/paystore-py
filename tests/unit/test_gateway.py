@@ -4,6 +4,9 @@ import pytest
 
 from paystore.core.exceptions import ConfigurationError
 from paystore.core.gateway import Gateway
+from paystore.providers.flutterwave.provider import FlutterwaveProvider
+from paystore.providers.paystack.provider import PaystackProvider
+from paystore.providers.stripe.provider import StripeProvider
 
 
 def test_gateway_initialization():
@@ -16,3 +19,114 @@ def test_gateway_invalid_provider():
     """Test gateway raises error for invalid provider."""
     with pytest.raises(ConfigurationError):
         Gateway(provider="invalid_provider", api_key="sk_test_key")
+
+
+def test_gateway_requires_api_key(monkeypatch):
+    """Test gateway raises error when no api key can be resolved."""
+    for var in ("PAYSTACK_SECRET_KEY", "PAYSTACK_API_KEY", "PAYMENT_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    with pytest.raises(ConfigurationError):
+        Gateway(provider="paystack")
+
+
+@pytest.mark.parametrize(
+    "provider,expected_class",
+    [
+        ("paystack", PaystackProvider),
+        ("flutterwave", FlutterwaveProvider),
+        ("stripe", StripeProvider),
+    ],
+)
+def test_gateway_loads_each_supported_provider(provider, expected_class):
+    """Switching the provider name is enough to swap gateways."""
+    gateway = Gateway(provider=provider, api_key="test_key")
+    assert isinstance(gateway._provider, expected_class)
+
+
+def test_gateway_resolves_provider_specific_env_key(monkeypatch):
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_from_env")
+    gateway = Gateway(provider="stripe")
+    assert gateway.config.api_key == "sk_test_from_env"
+
+
+class _FakeProvider:
+    """Records calls made through Gateway's operation facades."""
+
+    def __init__(self, config=None):
+        self.calls = []
+
+    def initialize_payment(self, **kwargs):
+        self.calls.append(("initialize_payment", kwargs))
+        return {"reference": "TXN_1"}
+
+    def verify_payment(self, reference):
+        self.calls.append(("verify_payment", reference))
+        return {"status": "success"}
+
+    def charge_authorization(self, **kwargs):
+        self.calls.append(("charge_authorization", kwargs))
+        return {"status": "success"}
+
+    def create_customer(self, **kwargs):
+        self.calls.append(("create_customer", kwargs))
+        return {"customer_code": "CUS_1"}
+
+    def get_customer(self, customer_code):
+        self.calls.append(("get_customer", customer_code))
+        return {"customer_code": customer_code}
+
+    def update_customer(self, customer_code, **kwargs):
+        self.calls.append(("update_customer", (customer_code, kwargs)))
+        return {"customer_code": customer_code}
+
+    def list_customer_authorizations(self, customer_code):
+        self.calls.append(("list_customer_authorizations", customer_code))
+        return []
+
+    def deactivate_authorization(self, authorization_code):
+        self.calls.append(("deactivate_authorization", authorization_code))
+        return {"success": True}
+
+
+@pytest.fixture
+def gateway_with_fake_provider(monkeypatch):
+    gateway = Gateway(provider="paystack", api_key="sk_test_key")
+    fake = _FakeProvider()
+    gateway._provider = fake
+    return gateway, fake
+
+
+def test_payments_facade_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.payments.initialize(amount=1000, email="a@example.com")
+    gateway.payments.verify("TXN_1")
+    gateway.payments.charge_authorization(
+        authorization_code="AUTH_1", email="a@example.com", amount=500
+    )
+    assert [call[0] for call in fake.calls] == [
+        "initialize_payment",
+        "verify_payment",
+        "charge_authorization",
+    ]
+
+
+def test_customers_facade_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.customers.create(email="a@example.com")
+    gateway.customers.get("CUS_1")
+    gateway.customers.update("CUS_1", phone="123")
+    assert [call[0] for call in fake.calls] == [
+        "create_customer",
+        "get_customer",
+        "update_customer",
+    ]
+
+
+def test_tokens_facade_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.tokens.list_for_customer("CUS_1")
+    gateway.tokens.deactivate("AUTH_1")
+    assert [call[0] for call in fake.calls] == [
+        "list_customer_authorizations",
+        "deactivate_authorization",
+    ]

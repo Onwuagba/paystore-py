@@ -82,6 +82,13 @@ class Gateway:
             if not resolved_provider:
                 raise ConfigurationError("Provider not specified")
 
+            if "webhook_secret" not in kwargs:
+                resolved_webhook_secret = self._resolve_webhook_secret(
+                    resolved_provider
+                )
+                if resolved_webhook_secret:
+                    kwargs["webhook_secret"] = resolved_webhook_secret
+
             self.config = Config(
                 provider=resolved_provider,
                 api_key=resolved_api_key,
@@ -126,6 +133,13 @@ class Gateway:
             f"API key not provided. Either pass api_key parameter or set "
             f"{provider.upper() if provider else 'PROVIDER'}_SECRET_KEY "
             f"environment variable."
+        )
+
+    def _resolve_webhook_secret(self, provider: str) -> Optional[str]:
+        """Resolve webhook secret from provider-specific or generic env vars."""
+        provider_upper = provider.upper()
+        return os.getenv(f"{provider_upper}_WEBHOOK_SECRET") or os.getenv(
+            "PAYMENT_WEBHOOK_SECRET"
         )
 
     def _load_provider(self) -> BaseProvider:

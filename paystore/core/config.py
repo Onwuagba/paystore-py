@@ -1,5 +1,7 @@
 """Configuration management."""
 
+from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -10,6 +12,14 @@ class Config(BaseModel):
     api_key: str = Field(..., description="Provider API key")
     environment: str = Field(default="sandbox", description="Environment")
     timeout: int = Field(default=30, description="Request timeout")
+    webhook_secret: Optional[str] = Field(
+        default=None,
+        description=(
+            "Secret used to verify webhook signatures. Required by providers "
+            "that sign webhooks with a value other than the API key "
+            "(e.g. Stripe's whsec_..., Flutterwave's dashboard secret hash)."
+        ),
+    )
 
     @field_validator("environment")
     @classmethod

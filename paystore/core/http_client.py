@@ -20,8 +20,19 @@ class HTTPClient:
         data: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        """Make POST request."""
+        """Make POST request with a JSON body."""
         response = self.client.post(url, json=data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    def post_form(
+        self,
+        url: str,
+        data: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """Make POST request with a form-encoded body (required by e.g. Stripe)."""
+        response = self.client.post(url, data=data, headers=headers)
         response.raise_for_status()
         return response.json()
 
