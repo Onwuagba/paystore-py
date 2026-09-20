@@ -88,3 +88,56 @@ def test_post_form_raises_network_error_without_retry(client, monkeypatch):
     with pytest.raises(NetworkError):
         client.post_form("https://example.com", data={})
     assert mock_post.call_count == 1
+
+
+def test_raised_exceptions_suppress_the_original_httpx_cause(client, monkeypatch):
+    """
+    httpx.HTTPStatusError's default message embeds the full URL, and some
+    providers (Remita) embed credentials in the URL path — so the raw
+    httpx exception must never ride along as __cause__/__context__,
+    or a normal traceback would print it and leak the secret.
+    """
+    monkeypatch.setattr(
+        client.client, "get", MagicMock(side_effect=_http_status_error(401))
+    )
+    try:
+        client.get("https://example.com")
+    except AuthenticationError as e:
+        assert e.__cause__ is None
+    else:
+        pytest.fail("expected AuthenticationError")
+
+
+def test_network_error_message_never_includes_the_full_url(client, monkeypatch):
+    secret_url = (
+        "https://api.example.com/echannelsvc/MERCHANT/SECRET_API_KEY/status.reg"
+    )
+    request = httpx.Request("GET", secret_url)
+    monkeypatch.setattr(
+        client.client,
+        "get",
+        MagicMock(side_effect=httpx.ConnectError("boom", request=request)),
+    )
+    with pytest.raises(NetworkError) as excinfo:
+        client.get(secret_url)
+    assert "SECRET_API_KEY" not in str(excinfo.value)
+
+
+def test_get_logs_are_scrubbed_of_url_path(client, monkeypatch, caplog):
+    secret_url = (
+        "https://api.example.com/echannelsvc/MERCHANT/SECRET_API_KEY/status.reg"
+    )
+    monkeypatch.setattr(
+        client.client,
+        "get",
+        MagicMock(
+            return_value=httpx.Response(
+                200, json={"ok": True}, request=httpx.Request("GET", secret_url)
+            )
+        ),
+    )
+    with caplog.at_level("DEBUG", logger="paystore.http"):
+        client.get(secret_url)
+    log_text = "\n".join(record.getMessage() for record in caplog.records)
+    assert "SECRET_API_KEY" not in log_text
+    assert "api.example.com" in log_text

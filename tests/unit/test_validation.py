@@ -45,3 +45,9 @@ def test_validate_amount_accepts_positive():
 def test_validate_amount_rejects_non_positive(amount):
     with pytest.raises(ValidationError):
         validate_amount(amount)
+
+
+@pytest.mark.parametrize("amount", [10.5, "1000", None, True, False])
+def test_validate_amount_rejects_non_int(amount):
+    with pytest.raises(ValidationError, match="must be an int"):
+        validate_amount(amount)
