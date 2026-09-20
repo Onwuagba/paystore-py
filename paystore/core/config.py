@@ -1,12 +1,26 @@
 """Configuration management."""
 
-from typing import Optional
+from typing import Any, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
+_MASKED_FIELDS = {"api_key", "api_secret", "webhook_secret"}
+
+
+def _mask(value: str) -> str:
+    if len(value) <= 4:
+        return "***"
+    return f"***{value[-4:]}"
+
 
 class Config(BaseModel):
-    """Configuration for the payment gateway."""
+    """
+    Configuration for the payment gateway.
+
+    Secrets (api_key, api_secret, webhook_secret) are masked in repr()/
+    str() so printing or logging a Config by accident doesn't leak them
+    in plaintext.
+    """
 
     provider: str = Field(..., description="Payment provider name")
     api_key: str = Field(..., description="Provider API key")
@@ -41,3 +55,9 @@ class Config(BaseModel):
         if v not in ("sandbox", "production"):
             raise ValueError("Environment must be 'sandbox' or 'production'")
         return v
+
+    def __repr_args__(self) -> List[Tuple[Optional[str], Any]]:
+        return [
+            (name, _mask(value) if name in _MASKED_FIELDS and value else value)
+            for name, value in super().__repr_args__()
+        ]
