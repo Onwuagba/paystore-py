@@ -27,6 +27,8 @@ _SUCCESS_STATUS_CODES = {"00", "01"}
 class RemitaProvider(BaseProvider):
     """Remita payment provider (RRR-based collections flow)."""
 
+    SUPPORTED_FEATURES = frozenset()  # no optional features
+
     SANDBOX_BASE_URL = "https://remitademo.net/remita/exapp/api/v1/send/api"
     LIVE_BASE_URL = "https://login.remita.net/remita/exapp/api/v1/send/api"
     SANDBOX_PAYMENT_URL = "https://remitademo.net/payment/v1/remita/ecomm/{rrr}/pay"

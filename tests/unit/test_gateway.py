@@ -45,6 +45,42 @@ def test_gateway_loads_each_supported_provider(provider, expected_class):
     assert isinstance(gateway._provider, expected_class)
 
 
+@pytest.mark.parametrize(
+    "provider,feature,expected",
+    [
+        ("paystack", "charge_authorization", True),
+        ("paystack", "customers", True),
+        ("paystack", "tokens", True),
+        ("flutterwave", "charge_authorization", True),
+        ("flutterwave", "customers", False),
+        ("flutterwave", "tokens", False),
+        ("stripe", "customers", True),
+        ("stripe", "tokens", True),
+    ],
+)
+def test_gateway_supports_matches_provider_capabilities(provider, feature, expected):
+    gateway = Gateway(provider=provider, api_key="test_key")
+    assert gateway.supports(feature) is expected
+
+
+def test_gateway_supports_remita_has_no_optional_features():
+    gateway = Gateway(
+        provider="remita",
+        api_key="test_key",
+        api_secret="test_secret",
+        merchant_id="MERCHANT_1",
+        service_type_id="SERVICE_1",
+    )
+    assert gateway.supports("charge_authorization") is False
+    assert gateway.supports("customers") is False
+    assert gateway.supports("tokens") is False
+
+
+def test_gateway_supports_unknown_feature_is_false():
+    gateway = Gateway(provider="paystack", api_key="test_key")
+    assert gateway.supports("time-travel") is False
+
+
 def test_gateway_resolves_provider_specific_env_key(monkeypatch):
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_from_env")
     gateway = Gateway(provider="stripe")

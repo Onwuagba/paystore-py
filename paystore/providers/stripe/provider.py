@@ -61,6 +61,7 @@ class StripeProvider(BaseProvider):
     """
 
     BASE_URL = "https://api.stripe.com/v1"
+    SUPPORTED_FEATURES = frozenset({"charge_authorization", "customers", "tokens"})
 
     def __init__(self, config):
         super().__init__(config)

@@ -201,6 +201,22 @@ class Gateway:
 
         return WebhookVerifier(self._provider).verify(payload, signature)
 
+    def supports(self, feature: str) -> bool:
+        """
+        Check whether the active provider supports an optional feature,
+        instead of calling it and catching NotImplementedError.
+
+        Args:
+            feature: one of "charge_authorization", "customers", "tokens".
+                initialize/verify/webhook verification are supported by
+                every provider and aren't part of this check.
+
+        Example:
+            >>> if gateway.supports("customers"):
+            ...     gateway.customers.create(email="a@example.com")
+        """
+        return feature in self._provider.SUPPORTED_FEATURES
+
 
 class CustomerOperations:
     """Customer management operations."""

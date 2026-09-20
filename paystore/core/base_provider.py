@@ -1,13 +1,32 @@
 """Base provider abstract class."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional
 
 from paystore.core.config import Config
 
 
 class BaseProvider(ABC):
-    """Abstract base class for all payment providers."""
+    """
+    Abstract base class for all payment providers.
+
+    initialize_payment, verify_payment, and verify_webhook_signature are
+    required of every provider. charge_authorization, customer
+    management, and token listing/deactivation are optional — a
+    provider that doesn't support one should declare that in
+    SUPPORTED_FEATURES (checked via Gateway.supports()) rather than
+    silently accepting calls it can't fulfill.
+    """
+
+    SUPPORTED_FEATURES: FrozenSet[str] = frozenset()
+    """
+    Which optional features this provider implements. Valid values:
+    "charge_authorization", "customers", "tokens". A provider that
+    doesn't include a feature here should still override its methods to
+    raise NotImplementedError with a clear message (see the defaults
+    below) — SUPPORTED_FEATURES is for callers who want to check ahead
+    of time via Gateway.supports() instead of catching the exception.
+    """
 
     def __init__(self, config: Config):
         self.config = config

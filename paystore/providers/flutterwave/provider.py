@@ -30,6 +30,7 @@ class FlutterwaveProvider(BaseProvider):
     """
 
     BASE_URL = "https://api.flutterwave.com/v3"
+    SUPPORTED_FEATURES = frozenset({"charge_authorization"})
 
     def __init__(self, config):
         super().__init__(config)
