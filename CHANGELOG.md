@@ -34,8 +34,26 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   checking, and `SECURITY.md` with a vulnerability-disclosure policy.
 - `AsyncGateway`: a thread-pool-backed async wrapper around `Gateway` for
   FastAPI/async Django, without a full async rewrite of every provider.
+- `validate_amount` now rejects non-`int` amounts (e.g. `10.50`), which
+  previously would have been silently sent to the provider as-is.
+- Request logging under the `"paystore.http"` logger (method/host/
+  outcome only, silent by default) via the standard `logging` module.
+- `Config.__repr__`/`__str__` now mask `api_key`/`api_secret`/
+  `webhook_secret` so printing or logging a `Config` doesn't leak them.
+- `Gateway.supports(feature)` to check whether the active provider
+  implements an optional feature (`"charge_authorization"`,
+  `"customers"`, `"tokens"`) instead of catching `NotImplementedError`.
+- `examples/webhook_server_example.py`: a stdlib-only webhook receiver
+  for non-Django usage (paystore-django already had one for Django).
+- `scripts/smoke_test.py`: an opt-in script that hits real provider
+  sandboxes to catch anything mocked tests can't (see CONTRIBUTING.md).
 
 ### Fixed
+- `HTTPClient` exceptions now suppress the original httpx exception as
+  their cause (`raise ... from None`), since httpx's default
+  `HTTPStatusError` message embeds the full request URL and Remita
+  embeds its API key/hash directly in that URL — without this, a
+  routine traceback could print a Remita API key in plaintext.
 - `validate_email` rejected almost all real addresses due to a literal
   `{{2,}}` in its regex instead of the `{2,}` quantifier.
 - Several error messages across the codebase were missing their `f` prefix,

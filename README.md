@@ -92,6 +92,14 @@ gateway = Gateway(
 | Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ |
 | List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ |
 
+Check a provider's support in code instead of catching
+`NotImplementedError`:
+
+```python
+if gateway.supports("customers"):
+    gateway.customers.create(email="customer@example.com")
+```
+
 Notes:
 - Flutterwave has no first-class "saved customer" API comparable to
   Paystack's or Stripe's, so `gateway.customers` and `gateway.tokens`
@@ -132,6 +140,19 @@ It mirrors `Gateway`'s methods directly (`initialize_payment`,
 `get_customer`, `update_customer`, `list_tokens`, `deactivate_token`,
 `verify_webhook`) rather than the `.payments`/`.customers`/`.tokens`
 facade.
+
+## Logging
+
+paystore logs HTTP requests (method, host, and outcome only — never
+headers, bodies, or full URLs, since some providers embed credentials
+in the URL path) via the standard `logging` module under
+`"paystore.http"`. It's silent by default; enable it when debugging:
+
+```python
+import logging
+logging.getLogger("paystore").setLevel(logging.DEBUG)
+logging.basicConfig()
+```
 
 ## Django
 
