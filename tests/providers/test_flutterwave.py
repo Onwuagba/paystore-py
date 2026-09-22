@@ -134,3 +134,43 @@ def test_refund_payment_raises_when_id_missing(provider, monkeypatch):
 def test_create_plan_not_implemented(provider):
     with pytest.raises(NotImplementedError):
         provider.create_plan(name="Monthly", amount=5000, interval="monthly")
+
+
+def test_create_transfer_recipient_not_implemented(provider):
+    with pytest.raises(NotImplementedError):
+        provider.create_transfer_recipient(
+            name="Ada", account_number="0123456789", bank_code="058"
+        )
+
+
+def test_initiate_transfer_success(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {
+            "status": "success",
+            "data": {"id": 123, "reference": "gen_ref", "status": "NEW"},
+        }
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.initiate_transfer(
+        recipient={"account_bank": "058", "account_number": "0123456789"},
+        amount=5000,
+        reason="Payout",
+    )
+    assert result["reference"] == "gen_ref"
+    assert captured["account_bank"] == "058"
+    assert captured["narration"] == "Payout"
+
+
+def test_initiate_transfer_raises_on_failure(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": "error", "message": "Invalid account"},
+    )
+    with pytest.raises(ProviderError, match="Invalid account"):
+        provider.initiate_transfer(
+            recipient={"account_bank": "058", "account_number": "bad"}, amount=5000
+        )

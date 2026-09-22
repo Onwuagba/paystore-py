@@ -259,6 +259,59 @@ def test_cancel_subscription_raises_when_not_found(provider, monkeypatch):
         provider.cancel_subscription("unknown")
 
 
+def test_create_transfer_recipient_success(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": True, "data": {"recipient_code": "RCP_1"}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.create_transfer_recipient(
+        name="Ada Lovelace", account_number="0123456789", bank_code="058"
+    )
+    assert result["recipient_code"] == "RCP_1"
+    assert captured["type"] == "nuban"
+    assert captured["account_number"] == "0123456789"
+
+
+def test_create_transfer_recipient_raises_on_failure(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": False, "message": "Invalid bank code"},
+    )
+    with pytest.raises(ProviderError, match="Invalid bank code"):
+        provider.create_transfer_recipient(
+            name="Ada", account_number="0123456789", bank_code="000"
+        )
+
+
+def test_initiate_transfer_success(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": True, "data": {"transfer_code": "TRF_1", "status": "pending"}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.initiate_transfer(recipient="RCP_1", amount=5000, reason="Payout")
+    assert result["transfer_code"] == "TRF_1"
+    assert captured["recipient"] == "RCP_1"
+    assert captured["amount"] == 5000
+    assert captured["source"] == "balance"
+
+
+def test_initiate_transfer_raises_on_failure(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": False, "message": "Insufficient balance"},
+    )
+    with pytest.raises(ProviderError, match="Insufficient balance"):
+        provider.initiate_transfer(recipient="RCP_1", amount=5000)
+
+
 def test_verify_webhook_signature_valid(provider):
     payload = b'{"event": "charge.success"}'
     signature = hmac.new(

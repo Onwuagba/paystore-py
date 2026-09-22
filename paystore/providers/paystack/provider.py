@@ -14,7 +14,14 @@ class PaystackProvider(BaseProvider):
 
     BASE_URL = "https://api.paystack.co"
     SUPPORTED_FEATURES = frozenset(
-        {"charge_authorization", "customers", "tokens", "refunds", "subscriptions"}
+        {
+            "charge_authorization",
+            "customers",
+            "tokens",
+            "refunds",
+            "subscriptions",
+            "transfers",
+        }
     )
 
     def __init__(self, config):
@@ -295,6 +302,69 @@ class PaystackProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to cancel subscription: {e}") from e
+
+    def create_transfer_recipient(
+        self,
+        name: str,
+        account_number: str,
+        bank_code: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Register a NUBAN recipient to send payouts to."""
+        url = f"{self.BASE_URL}/transferrecipient"
+        payload = {
+            "type": kwargs.pop("type", "nuban"),
+            "name": name,
+            "account_number": account_number,
+            "bank_code": bank_code,
+            "currency": currency,
+            **kwargs,
+        }
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status"):
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Recipient creation failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create transfer recipient: {e}") from e
+
+    def initiate_transfer(
+        self,
+        recipient: Any,
+        amount: int,
+        reason: str = "",
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Send a payout to a previously created recipient.
+
+        `recipient` is the recipient_code returned by
+        create_transfer_recipient.
+        """
+        url = f"{self.BASE_URL}/transfer"
+        payload = {
+            "source": kwargs.pop("source", "balance"),
+            "amount": amount,
+            "recipient": recipient,
+            "reason": reason,
+            "currency": currency,
+            **kwargs,
+        }
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status"):
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Transfer failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to initiate transfer: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """Verify Paystack webhook signature."""

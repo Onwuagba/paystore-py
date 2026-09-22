@@ -196,6 +196,11 @@ class Gateway:
         """Access recurring billing (plans/subscriptions) operations."""
         return SubscriptionOperations(self._provider)
 
+    @property
+    def transfers(self) -> "TransferOperations":
+        """Access transfer/payout operations."""
+        return TransferOperations(self._provider)
+
     def verify_webhook(self, payload: bytes, signature: str) -> bool:
         """
         Verify a webhook signature for this gateway's provider.
@@ -213,9 +218,9 @@ class Gateway:
 
         Args:
             feature: one of "charge_authorization", "customers", "tokens",
-                "refunds", "subscriptions". initialize/verify/webhook
-                verification are supported by every provider and aren't
-                part of this check.
+                "refunds", "subscriptions", "transfers". initialize/
+                verify/webhook verification are supported by every
+                provider and aren't part of this check.
 
         Example:
             >>> if gateway.supports("customers"):
@@ -307,6 +312,60 @@ class SubscriptionOperations:
     def cancel(self, subscription_code: str, **kwargs: Any) -> Dict[str, Any]:
         """Cancel a subscription."""
         return self._provider.cancel_subscription(subscription_code, **kwargs)
+
+
+class TransferOperations:
+    """Transfer/payout operations (sending money out)."""
+
+    def __init__(self, provider: BaseProvider):
+        self._provider = provider
+
+    def create_recipient(
+        self,
+        name: str,
+        account_number: str,
+        bank_code: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Register a bank account to send payouts to.
+
+        Not every provider needs this as a separate step — check
+        gateway.supports("transfers") and the active provider's
+        docstring; some accept bank details directly in initiate().
+        """
+        return self._provider.create_transfer_recipient(
+            name=name,
+            account_number=account_number,
+            bank_code=bank_code,
+            currency=currency,
+            **kwargs,
+        )
+
+    def initiate(
+        self,
+        recipient: Any,
+        amount: int,
+        reason: str = "",
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Send a payout.
+
+        `recipient` is provider-specific: a recipient code from
+        create_recipient() for providers that need one, or bank account
+        details directly for providers that don't.
+        """
+        validate_amount(amount)
+        return self._provider.initiate_transfer(
+            recipient=recipient,
+            amount=amount,
+            reason=reason,
+            currency=currency,
+            **kwargs,
+        )
 
 
 class PaymentOperations:

@@ -34,10 +34,15 @@ class FlutterwaveProvider(BaseProvider):
     customer the way Paystack/Stripe do, so create_plan/
     create_subscription/cancel_subscription aren't implemented here
     either — use `initialize_payment(..., payment_plan=plan_id)` instead.
+
+    Transfers don't need a separate "recipient" object the way
+    Paystack's do — create_transfer_recipient isn't implemented;
+    initiate_transfer takes bank account details directly (see its
+    docstring).
     """
 
     BASE_URL = "https://api.flutterwave.com/v3"
-    SUPPORTED_FEATURES = frozenset({"charge_authorization", "refunds"})
+    SUPPORTED_FEATURES = frozenset({"charge_authorization", "refunds", "transfers"})
 
     def __init__(self, config):
         super().__init__(config)
@@ -184,6 +189,47 @@ class FlutterwaveProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to refund payment: {e}") from e
+
+    def initiate_transfer(
+        self,
+        recipient: Any,
+        amount: int,
+        reason: str = "",
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Send a payout.
+
+        `recipient` must be a dict with `account_bank` (Flutterwave's
+        bank code) and `account_number`, and optionally
+        `beneficiary_name` — Flutterwave has no separate "recipient"
+        object to create ahead of time, unlike Paystack.
+        """
+        url = f"{self.BASE_URL}/transfers"
+        tx_ref = kwargs.pop("reference", None) or generate_reference()
+
+        payload = {
+            "account_bank": recipient.get("account_bank"),
+            "account_number": recipient.get("account_number"),
+            "beneficiary_name": recipient.get("beneficiary_name"),
+            "amount": amount,
+            "narration": reason,
+            "currency": currency,
+            "reference": tx_ref,
+            **kwargs,
+        }
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status") == "success":
+                data = response.get("data", {})
+                return {**data, "reference": data.get("reference", tx_ref)}
+            raise ProviderError(response.get("message", "Transfer failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to initiate transfer: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """

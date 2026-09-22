@@ -22,7 +22,7 @@ class BaseProvider(ABC):
     """
     Which optional features this provider implements. Valid values:
     "charge_authorization", "customers", "tokens", "refunds",
-    "subscriptions". A provider that doesn't include a feature here
+    "subscriptions", "transfers". A provider that doesn't include a feature here
     should still override its methods to raise NotImplementedError with
     a clear message (see the defaults below) — SUPPORTED_FEATURES is
     for callers who want to check ahead of time via Gateway.supports()
@@ -149,4 +149,41 @@ class BaseProvider(ABC):
         """Cancel a subscription (optional implementation)."""
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support subscriptions"
+        )
+
+    def create_transfer_recipient(
+        self,
+        name: str,
+        account_number: str,
+        bank_code: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Register a bank account to send payouts to (optional
+        implementation). Not every provider needs this as a separate
+        step — see initiate_transfer.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support transfers"
+        )
+
+    def initiate_transfer(
+        self,
+        recipient: Any,
+        amount: int,
+        reason: str = "",
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Send a payout (optional implementation).
+
+        `recipient` is provider-specific: a recipient code from
+        create_transfer_recipient for providers that need one, or bank
+        account details directly for providers that don't — see each
+        provider's docstring.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support transfers"
         )

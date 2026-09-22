@@ -64,6 +64,12 @@ class StripeProvider(BaseProvider):
     (JPY, KRW, etc.), where the smallest unit *is* the major unit; see
     paystore.utils.currency.is_zero_decimal_currency. Passing 500 for a
     JPY charge means ¥500, not ¥5.00.
+
+    Transfers aren't implemented: Stripe's payout model (Connect —
+    connected accounts, onboarding, destination charges) is a
+    fundamentally different integration than "send money to a bank
+    account by number," not a drop-in equivalent of the other
+    providers' transfer APIs.
     """
 
     BASE_URL = "https://api.stripe.com/v1"

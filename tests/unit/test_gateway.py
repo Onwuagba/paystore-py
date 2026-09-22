@@ -156,6 +156,14 @@ class _FakeProvider:
         self.calls.append(("cancel_subscription", (subscription_code, kwargs)))
         return {"success": True}
 
+    def create_transfer_recipient(self, **kwargs):
+        self.calls.append(("create_transfer_recipient", kwargs))
+        return {"recipient_code": "RCP_1"}
+
+    def initiate_transfer(self, **kwargs):
+        self.calls.append(("initiate_transfer", kwargs))
+        return {"transfer_code": "TRF_1"}
+
 
 @pytest.fixture
 def gateway_with_fake_provider(monkeypatch):
@@ -356,15 +364,37 @@ def test_subscriptions_create_plan_validates_amount(gateway_with_fake_provider):
     assert fake.calls == []
 
 
+def test_transfers_facade_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.transfers.create_recipient(
+        name="Ada", account_number="0123456789", bank_code="058"
+    )
+    gateway.transfers.initiate(recipient="RCP_1", amount=5000)
+    assert [call[0] for call in fake.calls] == [
+        "create_transfer_recipient",
+        "initiate_transfer",
+    ]
+
+
+def test_transfers_initiate_validates_amount(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.transfers.initiate(recipient="RCP_1", amount=-1)
+    assert fake.calls == []
+
+
 @pytest.mark.parametrize(
     "provider,feature,expected",
     [
         ("paystack", "refunds", True),
         ("paystack", "subscriptions", True),
+        ("paystack", "transfers", True),
         ("flutterwave", "refunds", True),
         ("flutterwave", "subscriptions", False),
+        ("flutterwave", "transfers", True),
         ("stripe", "refunds", True),
         ("stripe", "subscriptions", True),
+        ("stripe", "transfers", False),
     ],
 )
 def test_gateway_supports_refunds_and_subscriptions(provider, feature, expected):
