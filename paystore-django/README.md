@@ -97,6 +97,41 @@ class PaystackWebhookView(PaystoreAsyncWebhookView):
 
 `get_async_gateway()` is also available directly, mirroring `get_gateway()`.
 
+## Persisting transactions
+
+By default nothing is saved anywhere — `Gateway` uses a no-op storage
+backend unless you give it one. `DjangoORMStorage` saves every
+transaction result (from `initialize`/`verify`/`charge_authorization`/
+`refund`) to a `PaystoreTransaction` row, upserted by `reference`:
+
+```python
+# settings.py
+INSTALLED_APPS = [
+    ...,
+    "paystore_django",
+]
+```
+
+```bash
+python manage.py migrate
+```
+
+```python
+from paystore_django import get_gateway, DjangoORMStorage
+
+def checkout(request):
+    gateway = get_gateway(storage=DjangoORMStorage())
+    transaction = gateway.payments.initialize(
+        amount=10000, email=request.user.email
+    )
+    return redirect(transaction["authorization_url"])
+```
+
+`get_async_gateway(storage=DjangoORMStorage())` works the same way.
+Prefer your own storage? Subclass `paystore.storage.base.BaseStorage`
+and pass an instance of that instead — `DjangoORMStorage` is one
+implementation, not a requirement.
+
 ## Development
 
 This package lives in the same repo as `paystore` core and depends on

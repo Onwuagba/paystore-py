@@ -5,8 +5,14 @@ USE_TZ = True
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
+    "paystore_django",
 ]
-DATABASES = {}
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
+}
 ROOT_URLCONF = "paystore_django_tests.urls"
 
 PAYSTORE = {

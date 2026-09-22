@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 
 from django.conf import settings
 from paystore import AsyncGateway, Gateway
+from paystore.storage.base import BaseStorage
 
 
 def _paystore_settings() -> Dict[str, Any]:
@@ -43,7 +44,9 @@ def _gateway_kwargs(provider: Optional[str]) -> Dict[str, Any]:
     return kwargs
 
 
-def get_gateway(provider: Optional[str] = None) -> Gateway:
+def get_gateway(
+    provider: Optional[str] = None, storage: Optional[BaseStorage] = None
+) -> Gateway:
     """
     Build a Gateway from Django settings.
 
@@ -51,14 +54,19 @@ def get_gateway(provider: Optional[str] = None) -> Gateway:
         provider: Overrides PAYSTORE["PROVIDER"] from settings — useful
             when a single Django project supports multiple gateways
             (e.g. choosing per-currency or per-request).
+        storage: Optional BaseStorage backend — pass
+            DjangoORMStorage() to persist transaction results to the
+            database (see paystore_django.storage).
     """
-    return Gateway(**_gateway_kwargs(provider))
+    return Gateway(storage=storage, **_gateway_kwargs(provider))
 
 
-def get_async_gateway(provider: Optional[str] = None) -> AsyncGateway:
+def get_async_gateway(
+    provider: Optional[str] = None, storage: Optional[BaseStorage] = None
+) -> AsyncGateway:
     """
     Build an AsyncGateway from Django settings, for async views.
 
-    Same PAYSTORE settings and `provider` override as get_gateway().
+    Same PAYSTORE settings, `provider`, and `storage` as get_gateway().
     """
-    return AsyncGateway(**_gateway_kwargs(provider))
+    return AsyncGateway(storage=storage, **_gateway_kwargs(provider))
