@@ -20,9 +20,9 @@ def client():
     return HTTPClient(Config(provider="paystack", api_key="sk_test_mock"))
 
 
-def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
+def _http_status_error(status_code: int, headers=None) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", "https://example.com")
-    response = httpx.Response(status_code, request=request)
+    response = httpx.Response(status_code, request=request, headers=headers)
     return httpx.HTTPStatusError("error", request=request, response=response)
 
 
@@ -50,6 +50,48 @@ def test_get_retries_then_raises_rate_limit_error(client, monkeypatch):
     with pytest.raises(RateLimitError):
         client.get("https://example.com")
     assert mock_get.call_count == 3  # initial + 2 retries
+
+
+def test_get_respects_retry_after_header(client, monkeypatch):
+    sleep_calls = []
+    monkeypatch.setattr(
+        "paystore.core.http_client.time.sleep", lambda s: sleep_calls.append(s)
+    )
+    mock_get = MagicMock(
+        side_effect=_http_status_error(429, headers={"Retry-After": "3"})
+    )
+    monkeypatch.setattr(client.client, "get", mock_get)
+    with pytest.raises(RateLimitError):
+        client.get("https://example.com")
+    assert sleep_calls == [3.0, 3.0]
+
+
+def test_get_caps_retry_after_at_max(client, monkeypatch):
+    sleep_calls = []
+    monkeypatch.setattr(
+        "paystore.core.http_client.time.sleep", lambda s: sleep_calls.append(s)
+    )
+    mock_get = MagicMock(
+        side_effect=_http_status_error(429, headers={"Retry-After": "9999"})
+    )
+    monkeypatch.setattr(client.client, "get", mock_get)
+    with pytest.raises(RateLimitError):
+        client.get("https://example.com")
+    assert all(s == 30.0 for s in sleep_calls)
+
+
+def test_get_falls_back_to_backoff_for_invalid_retry_after(client, monkeypatch):
+    sleep_calls = []
+    monkeypatch.setattr(
+        "paystore.core.http_client.time.sleep", lambda s: sleep_calls.append(s)
+    )
+    mock_get = MagicMock(
+        side_effect=_http_status_error(429, headers={"Retry-After": "not-a-number"})
+    )
+    monkeypatch.setattr(client.client, "get", mock_get)
+    with pytest.raises(RateLimitError):
+        client.get("https://example.com")
+    assert sleep_calls == [0.5, 1.0]
 
 
 def test_get_retries_5xx_then_succeeds(client, monkeypatch):

@@ -111,13 +111,17 @@ class HTTPClient:
                     ) from None
                 if status == 429:
                     if attempt < retries:
+                        wait = self._retry_after_seconds(
+                            e.response
+                        ) or self._backoff_delay(attempt)
                         logger.warning(
-                            "%s %s -> 429, retrying (attempt %d)",
+                            "%s %s -> 429, retrying in %.1fs (attempt %d)",
                             method,
                             host,
+                            wait,
                             attempt + 1,
                         )
-                        self._backoff(attempt)
+                        time.sleep(wait)
                         attempt += 1
                         continue
                     logger.error("%s %s -> 429 (rate limited, giving up)", method, host)
@@ -159,4 +163,28 @@ class HTTPClient:
 
     @staticmethod
     def _backoff(attempt: int) -> None:
-        time.sleep(0.5 * (2**attempt))
+        time.sleep(HTTPClient._backoff_delay(attempt))
+
+    @staticmethod
+    def _backoff_delay(attempt: int) -> float:
+        return 0.5 * (2**attempt)
+
+    _MAX_RETRY_AFTER_SECONDS = 30.0
+
+    @classmethod
+    def _retry_after_seconds(cls, response: httpx.Response) -> Optional[float]:
+        """
+        Parse a Retry-After header (seconds, per RFC 9110 — HTTP-date form
+        is ignored since providers only send seconds in practice). Caps
+        it so a provider can't stall a request indefinitely.
+        """
+        value = response.headers.get("Retry-After")
+        if not value:
+            return None
+        try:
+            seconds = float(value)
+        except ValueError:
+            return None
+        if seconds < 0:
+            return None
+        return min(seconds, cls._MAX_RETRY_AFTER_SECONDS)
