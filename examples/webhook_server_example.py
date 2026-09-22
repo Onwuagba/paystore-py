@@ -75,15 +75,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     provider = os.getenv("PAYMENT_PROVIDER", "paystack")
+    host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
 
     WebhookHandler.gateway = Gateway(provider=provider)  # reads {PROVIDER}_SECRET_KEY
 
-    print(f"Webhook server for '{provider}' listening on http://localhost:{port}")
+    print(f"Webhook server for '{provider}' listening on http://{host}:{port}")
     print("Expose this with a tunnel (ngrok, the Stripe CLI, etc.) and register")
     print("the public URL as your webhook endpoint in the provider's dashboard.\n")
 
-    HTTPServer(("0.0.0.0", port), WebhookHandler).serve_forever()
+    HTTPServer((host, port), WebhookHandler).serve_forever()
 
 
 if __name__ == "__main__":
