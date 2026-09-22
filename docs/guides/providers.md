@@ -99,3 +99,40 @@ gateway = Gateway(
   against your own sandbox account before relying on this in
   production, and double-check field names/status codes if something
   doesn't match.
+
+## PayPal
+
+```python
+gateway = Gateway(
+    provider="paypal",
+    api_key="...",         # the app's Client ID
+    api_secret="...",      # required — the app's Client Secret
+    webhook_secret="...",  # required for webhooks — the Webhook ID, not a signing secret
+)
+```
+
+- Env var for `api_key`: `PAYPAL_SECRET_KEY`. `api_secret` has no env
+  var auto-resolution — pass it explicitly.
+- **Does not support NGN.** Pass a currency PayPal supports, e.g.
+  `currency="USD"`.
+- Auth is OAuth2 client credentials, not a static Bearer key — an
+  access token is fetched and cached automatically, refreshed shortly
+  before it expires. Amounts are decimal strings in PayPal's API
+  ("10.00"); still pass minor-unit ints here (1000) like every other
+  provider — converted internally (zero-decimal currencies excepted,
+  same as Stripe).
+- `initialize_payment` creates an Order the customer must approve —
+  `verify_payment` captures it automatically if it's `APPROVED`.
+  PayPal payments don't complete on their own the way the other
+  providers' do.
+- `refund_payment` resolves your Order `reference` to its capture id
+  first (one extra API call).
+- Only `initialize_payment`, `verify_payment`, `refund_payment`, and
+  webhook verification are implemented — PayPal's saved-payment-method
+  product (Vault) is a separate, more involved API not covered here.
+- Webhook verification needs **multiple** header values, not one
+  signature string like every other provider — see
+  [webhooks.md](webhooks.md) and the provider's own docstring for the
+  exact shape to pass as `signature`.
+- ⚠️ Implemented from PayPal's published Orders v2/Webhooks docs, not
+  verified against a live account — same caveat as Remita.

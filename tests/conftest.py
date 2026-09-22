@@ -31,3 +31,27 @@ def stripe_config():
         environment="sandbox",
         webhook_secret="whsec_mock",
     )
+
+
+@pytest.fixture
+def paypal_config():
+    """Mock PayPal configuration."""
+    return Config(
+        provider="paypal",
+        api_key="mock_client_id",
+        api_secret="mock_client_secret",
+        environment="sandbox",
+        webhook_secret="mock_webhook_id",
+    )
+
+
+@pytest.fixture
+def momo_config():
+    """Mock MTN MoMo configuration."""
+    return Config(
+        provider="momo",
+        api_key="mock_api_user",
+        api_secret="mock_api_key",
+        environment="sandbox",
+        webhook_secret="mock_subscription_key",
+    )

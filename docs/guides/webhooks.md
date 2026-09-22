@@ -70,6 +70,14 @@ SIGNATURE_HEADERS
 # }
 ```
 
+PayPal is deliberately not in this dict — it needs *several* header
+values, not one, so it doesn't fit the "single signature string" model
+the rest of this guide (and the generic Django/stdlib webhook views)
+assumes. If you're using PayPal, build the `signature` argument
+yourself as a JSON object of the relevant headers — see
+`PaypalProvider.verify_webhook_signature`'s docstring for the exact
+shape — rather than using `SIGNATURE_HEADERS`/the generic views as-is.
+
 ## Provider-specific signing secrets
 
 Paystack and Remita sign webhooks with your `api_key`/`api_secret`, so

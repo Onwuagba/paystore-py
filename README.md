@@ -5,7 +5,7 @@ switching gateways is a one-line change instead of a rewrite.
 
 ## Features
 
-- Multi-provider support: Paystack, Flutterwave, Stripe, Remita
+- Multi-provider support: Paystack, Flutterwave, Stripe, Remita, PayPal
 - Swap providers by changing one string — `initialize`/`verify`/
   `charge_authorization` return a consistent shape (`reference`,
   `authorization_url`, `status`) across all of them
@@ -87,15 +87,17 @@ gateway = Gateway(
 
 ## Provider Support
 
-| Capability                                       | Paystack | Flutterwave | Stripe | Remita |
-| ------------------------------------------------ | -------- | ----------- | ------ | ------ |
-| Initialize / verify payment                      | ✅       | ✅          | ✅     | ✅     |
-| Charge saved card (`charge_authorization`)     | ✅       | ✅          | ✅     | ❌     |
-| Webhook signature verification                   | ✅       | ✅          | ✅     | ✅     |
-| Customer management (`gateway.customers`)      | ✅       | ❌          | ✅     | ❌     |
-| List/deactivate saved cards (`gateway.tokens`) | ✅       | ❌          | ✅     | ❌     |
-| Refunds (`gateway.payments.refund`)            | ✅       | ✅          | ✅     | ❌     |
-| Recurring billing (`gateway.subscriptions`)    | ✅       | ❌          | ✅     | ❌     |
+| Capability | Paystack | Flutterwave | Stripe | Remita | PayPal |
+|---|---|---|---|---|---|
+| Initialize / verify payment | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Charge saved card (`charge_authorization`) | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Webhook signature verification | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Refunds (`gateway.payments.refund`) | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Transfers/payouts (`gateway.transfers`) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Split payments (`gateway.subaccounts`) | ✅ | ✅ | ➖ (passthrough kwargs) | ❌ | ❌ |
 
 Check a provider's support in code instead of catching
 `NotImplementedError`:
@@ -125,10 +127,26 @@ Notes:
   addition to `api_key`. It was implemented from Remita's published
   docs but not verified against a live sandbox — double-check field
   names/status codes for your account before relying on it in production.
+- PayPal does not support NGN either. Auth is OAuth2 client
+  credentials (`api_key` = Client ID, `api_secret` = Client Secret,
+  both required); webhook verification needs multiple header values,
+  not one signature string — see [docs/guides/providers.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/providers.md#paypal).
+  Also implemented from docs, not verified against a live account.
 - Refunds accept an optional `amount` for a partial refund; omit it to
   refund in full: `gateway.payments.refund(reference, amount=500)`.
 - Plan `interval` values are provider-specific and passed straight
   through — Paystack wants `"monthly"`, Stripe wants `"month"`, etc.
+- Transfers: Paystack needs a `create_recipient()` step first;
+  Flutterwave's `initiate()` takes bank details directly instead.
+  Stripe's payout model (Connect) is different enough it isn't wrapped
+  here at all.
+- Split payments: create a subaccount, then pass its id to
+  `initialize()` via a provider-specific kwarg (Paystack's
+  `subaccount`, Flutterwave's `subaccounts`) — see
+  [docs/guides/providers.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/providers.md).
+  Stripe's equivalent (a destination charge) already works via
+  `initialize(transfer_data=..., application_fee_amount=...)` with no
+  new method needed.
 
 ## Refunds and recurring billing
 
@@ -145,6 +163,24 @@ subscription = gateway.subscriptions.subscribe(
     customer=customer["customer_code"], plan=plan["plan_code"]
 )
 gateway.subscriptions.cancel(subscription["subscription_code"])
+```
+
+## Transfers and split payments
+
+```python
+# Transfers/payouts (Paystack/Flutterwave — see Provider Support above)
+recipient = gateway.transfers.create_recipient(
+    name="Ada Lovelace", account_number="0123456789", bank_code="058"
+)
+gateway.transfers.initiate(recipient=recipient["recipient_code"], amount=5000)
+
+# Split payments (Paystack/Flutterwave)
+subaccount = gateway.subaccounts.create(
+    business_name="Vendor Ltd", account_number="0123456789", bank_code="058"
+)
+gateway.payments.initialize(
+    amount=10000, email="customer@example.com", subaccount=subaccount["subaccount_code"]
+)
 ```
 
 ## Async usage
