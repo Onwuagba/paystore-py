@@ -235,13 +235,13 @@ files = [
 
 [[package]]
 name = "paystore"
-version = "0.2.0"
+version = "0.2.1"
 description = "A unified Python library for integrating multiple payment providers"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "paystore-0.2.0-py3-none-any.whl", hash = "sha256:9676b85d108534138ad86f3de6207a230670a53fabf075ec4a397b215f7c7548"},
-    {file = "paystore-0.2.0.tar.gz", hash = "sha256:a261367fccbe35a614c798769dfcfd32db51917c96ea25ec4a922a96f3097b1b"},
+    {file = "paystore-0.2.1-py3-none-any.whl", hash = "sha256:8e8568dbd424c5a4fff55d904839ddf343a1fed6d917ea1efcfa91c60eb0d550"},
+    {file = "paystore-0.2.1.tar.gz", hash = "sha256:0ae7ff7cab50b70b04d94153c6fda53734a4b9fc0e09c517246013083e28be5c"},
 ]
 
 [package.dependencies]
@@ -419,6 +419,24 @@ tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
 
 [[package]]
+name = "pytest-asyncio"
+version = "0.21.2"
+description = "Pytest support for asyncio"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "pytest_asyncio-0.21.2-py3-none-any.whl", hash = "sha256:ab664c88bb7998f711d8039cacd4884da6430886ae8bbd4eded552ed2004f16b"},
+    {file = "pytest_asyncio-0.21.2.tar.gz", hash = "sha256:d67738fc232b94b326b9d060750beb16e0074210b98dd8b58a5239fa2a154f45"},
+]
+
+[package.dependencies]
+pytest = ">=7.0.0"
+
+[package.extras]
+docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
+testing = ["coverage (>=6.2)", "flaky (>=3.5.0)", "hypothesis (>=5.7.1)", "mypy (>=0.931)", "pytest-trio (>=0.7.0)"]
+
+[[package]]
 name = "pytest-django"
 version = "4.11.1"
 description = "A Django plugin for pytest."
@@ -557,4 +575,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "7a4d994678a6cd09d38c8a498246c98da664884866429e3695233fd5d26acfc2"
+content-hash = "638f6cecbd9d74bc79266c74e28497309e9d698d2f6e0350a9d37a86afcdc4ac"

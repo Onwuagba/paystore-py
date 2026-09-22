@@ -79,6 +79,24 @@ def on_webhook(sender, provider, event, **kwargs):
     ...
 ```
 
+### Async
+
+`PaystoreAsyncWebhookView` is the same thing backed by `AsyncGateway`,
+for Django's async views (`async def post`, ASGI deployment).
+`handle_event` may be `async def` or a plain function — both work:
+
+```python
+from paystore_django import PaystoreAsyncWebhookView
+
+class PaystackWebhookView(PaystoreAsyncWebhookView):
+    provider = "paystack"
+
+    async def handle_event(self, event, request):
+        await Order.objects.filter(reference=event["data"]["reference"]).aupdate(paid=True)
+```
+
+`get_async_gateway()` is also available directly, mirroring `get_gateway()`.
+
 ## Development
 
 This package lives in the same repo as `paystore` core and depends on
