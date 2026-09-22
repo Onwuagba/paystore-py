@@ -99,6 +99,8 @@ class HTTPClient:
                 response = request_fn()
                 response.raise_for_status()
                 logger.debug("%s %s -> %d", method, host, response.status_code)
+                if not response.content:
+                    return {}
                 return response.json()
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code

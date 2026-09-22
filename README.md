@@ -87,17 +87,17 @@ gateway = Gateway(
 
 ## Provider Support
 
-| Capability | Paystack | Flutterwave | Stripe | Remita | PayPal |
-|---|---|---|---|---|---|
-| Initialize / verify payment | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Charge saved card (`charge_authorization`) | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Webhook signature verification | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ | ❌ |
-| List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ | ❌ |
-| Refunds (`gateway.payments.refund`) | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ | ❌ |
-| Transfers/payouts (`gateway.transfers`) | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Split payments (`gateway.subaccounts`) | ✅ | ✅ | ➖ (passthrough kwargs) | ❌ | ❌ |
+| Capability | Paystack | Flutterwave | Stripe | Remita | PayPal | MoMo |
+|---|---|---|---|---|---|---|
+| Initialize / verify payment | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Charge saved card (`charge_authorization`) | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Webhook signature verification | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Refunds (`gateway.payments.refund`) | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Transfers/payouts (`gateway.transfers`) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Split payments (`gateway.subaccounts`) | ✅ | ✅ | ➖ (passthrough kwargs) | ❌ | ❌ | ❌ |
 
 Check a provider's support in code instead of catching
 `NotImplementedError`:
@@ -132,6 +132,13 @@ Notes:
   both required); webhook verification needs multiple header values,
   not one signature string — see [docs/guides/providers.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/providers.md#paypal).
   Also implemented from docs, not verified against a live account.
+- MoMo collects payments via a USSD/app prompt to the payer's phone —
+  pass `phone` (MSISDN) via kwargs to `initialize`, then poll `verify`
+  (there's no hosted checkout URL). Its credential fields are
+  repurposed from the usual ones (see
+  [docs/guides/providers.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/providers.md#mtn-mobile-money-momo)),
+  and webhook verification isn't implemented — MTN has no standardized
+  callback signature scheme to check honestly.
 - Refunds accept an optional `amount` for a partial refund; omit it to
   refund in full: `gateway.payments.refund(reference, amount=500)`.
 - Plan `interval` values are provider-specific and passed straight

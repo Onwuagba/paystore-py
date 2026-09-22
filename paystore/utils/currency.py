@@ -43,3 +43,15 @@ def is_zero_decimal_currency(currency: str) -> bool:
     do NOT multiply by 100 the way you would for NGN/USD-style amounts.
     """
     return currency.upper() in ZERO_DECIMAL_CURRENCIES
+
+
+def to_decimal_string(amount: int, currency: str) -> str:
+    """
+    Convert a minor-unit int amount to a decimal-string major-unit
+    amount, for providers (PayPal, MTN MoMo) whose API wants "10.00"
+    instead of 1000 — zero-decimal-currency aware, same as
+    is_zero_decimal_currency.
+    """
+    if is_zero_decimal_currency(currency):
+        return str(amount)
+    return f"{amount / 100:.2f}"

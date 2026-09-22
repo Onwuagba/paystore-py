@@ -32,15 +32,8 @@ from typing import Any, Dict, Optional
 from paystore.core.base_provider import BaseProvider
 from paystore.core.exceptions import ConfigurationError, PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
-from paystore.utils.currency import is_zero_decimal_currency
+from paystore.utils.currency import to_decimal_string as _format_amount
 from paystore.utils.helpers import generate_reference
-
-
-def _format_amount(amount: int, currency: str) -> str:
-    """Convert a minor-unit int amount to PayPal's decimal string format."""
-    if is_zero_decimal_currency(currency):
-        return str(amount)
-    return f"{amount / 100:.2f}"
 
 
 class PaypalProvider(BaseProvider):

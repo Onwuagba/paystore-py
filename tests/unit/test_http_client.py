@@ -105,6 +105,14 @@ def test_get_retries_5xx_then_succeeds(client, monkeypatch):
     assert mock_get.call_count == 2
 
 
+def test_post_with_empty_response_body_returns_empty_dict(client, monkeypatch):
+    request = httpx.Request("POST", "https://example.com")
+    empty_response = httpx.Response(202, content=b"", request=request)
+    monkeypatch.setattr(client.client, "post", MagicMock(return_value=empty_response))
+    result = client.post("https://example.com", data={})
+    assert result == {}
+
+
 def test_get_gives_up_on_4xx_without_retry(client, monkeypatch):
     mock_get = MagicMock(side_effect=_http_status_error(400))
     monkeypatch.setattr(client.client, "get", mock_get)

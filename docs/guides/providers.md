@@ -136,3 +136,43 @@ gateway = Gateway(
   exact shape to pass as `signature`.
 - ⚠️ Implemented from PayPal's published Orders v2/Webhooks docs, not
   verified against a live account — same caveat as Remita.
+
+## MTN Mobile Money (MoMo)
+
+```python
+gateway = Gateway(
+    provider="momo",
+    api_key="...",           # MoMo "API User" (a UUID, provisioned once via MTN's portal)
+    api_secret="...",        # required — MoMo "API Key" for that API User
+    webhook_secret="...",    # required — the Collections product's Subscription Key
+    merchant_id="sandbox",   # X-Target-Environment: "sandbox", or e.g. "mtnuganda" in production
+)
+```
+
+MoMo's credential set doesn't map cleanly onto `api_key`/`api_secret`/
+`webhook_secret`/`merchant_id`, so those fields are repurposed — see
+the mapping above and the provider's module docstring for the full
+explanation.
+
+- Env var for `api_key`: `MOMO_SECRET_KEY`. Everything else has no env
+  var auto-resolution — pass it explicitly.
+- Payments are collected via a USSD/app prompt sent to the payer's
+  **phone**, not a hosted checkout URL — pass `phone` (the payer's
+  MSISDN) via kwargs to `initialize`; `email` is accepted (every
+  provider's interface requires it) but unused.
+  `initialize` returns immediately with `status="pending"`; poll
+  `verify` with the returned reference to find out what actually
+  happened.
+- Amounts are decimal strings in MoMo's API ("10.00"), converted
+  internally the same way as PayPal (zero-decimal currencies excepted).
+- Only `initialize_payment`/`verify_payment` are implemented. No
+  saved-payment-method equivalent exists, so `charge_authorization`
+  raises `NotImplementedError`. **Webhook signature verification also
+  raises `NotImplementedError`** — MTN's callback mechanism has no
+  publicly standardized signing scheme across deployments to check
+  honestly, unlike every other provider here; poll `verify_payment`
+  instead of trusting an unauthenticated callback body.
+- ⚠️ Implemented from MTN MoMo's published Collections API docs, not
+  verified against a live account (same caveat as Remita/PayPal) — the
+  production base URL in particular varies by MTN partner/country
+  deployment.
