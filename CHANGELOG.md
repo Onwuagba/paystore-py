@@ -5,6 +5,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-22
+
+### Fixed
+- README links (docs, CONTRIBUTING.md, LICENSE, paystore-django) were
+  relative paths that work fine on GitHub but rendered dead on the
+  PyPI project page, since PyPI has no base URL to resolve them
+  against. Converted to absolute `github.com/onwuagba/paystore-py/...`
+  URLs.
+
 ## [0.2.0] - 2026-09-22
 
 ### Added

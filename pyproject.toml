@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "paystore"
-version = "0.2.0"
+version = "0.2.1"
 description = "A unified Python library for integrating multiple payment providers"
 authors = ["Onwuagba <onwuagbakenenna@gmail.com>"]
 license = "MIT"

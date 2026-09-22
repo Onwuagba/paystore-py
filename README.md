@@ -14,7 +14,7 @@ switching gateways is a one-line change instead of a rewrite.
   [provider support](#provider-support))
 - Webhook signature verification per provider
 - Credentials resolved from explicit args, env vars, or framework
-  settings (see [docs/guides/authentication.md](docs/guides/authentication.md))
+  settings (see [docs/guides/authentication.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/authentication.md))
 - `idempotency_key` on `charge_authorization` to safely retry a charge
   without double-charging; input validation and richer exceptions
   (`AuthenticationError`, `RateLimitError`, `NetworkError`) so callers
@@ -188,17 +188,17 @@ logging.basicConfig()
 
 ## Django
 
-For Django projects, see [paystore-django](paystore-django/) — a
+For Django projects, see [paystore-django](https://github.com/onwuagba/paystore-py/tree/main/paystore-django) — a
 settings-based `Gateway` factory and a ready-to-subclass webhook view,
 shipped as a separate installable package in this repo.
 
 ## Documentation
 
-See the [docs](docs/) directory for full documentation.
+See the [docs](https://github.com/onwuagba/paystore-py/tree/main/docs) directory for full documentation.
 
 ## Contributing
 
-We use Poetry for dependency management. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+We use Poetry for dependency management. See [CONTRIBUTING.md](https://github.com/onwuagba/paystore-py/blob/main/CONTRIBUTING.md) for details.
 
 ```bash
 # Setup development environment
@@ -215,4 +215,4 @@ poetry export -f requirements.txt --output requirements-dev.txt --with dev --wit
 
 ## License
 
-MIT License - see LICENSE file
+MIT License - see [LICENSE](https://github.com/onwuagba/paystore-py/blob/main/LICENSE)
