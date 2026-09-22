@@ -8,18 +8,15 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from paystore.core.exceptions import PaymentError
+from paystore.webhooks.headers import SIGNATURE_HEADERS
 
 from paystore_django.gateway import get_gateway
 from paystore_django.signals import webhook_verified
 
-# Provider name -> raw signature header, as it appears in request.META
-# (WSGI uppercases and prefixes custom headers with HTTP_).
-SIGNATURE_HEADERS = {
-    "paystack": "HTTP_X_PAYSTACK_SIGNATURE",
-    "flutterwave": "HTTP_VERIF_HASH",
-    "stripe": "HTTP_STRIPE_SIGNATURE",
-    "remita": "HTTP_X_REMITA_SIGNATURE",
-}
+
+def _to_wsgi_meta_key(header_name: str) -> str:
+    """Convert a plain HTTP header name to its Django request.META key."""
+    return "HTTP_" + header_name.upper().replace("-", "_")
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -43,14 +40,17 @@ class PaystoreWebhookView(View):
     """
 
     provider: Optional[str] = None  # pins this view to one provider
-    signature_header: Optional[str] = None  # override for a nonstandard header
+    # Plain header name override, e.g. "X-Foo-Signature"
+    signature_header: Optional[str] = None
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         gateway = get_gateway(self.provider)
         header_name = self.signature_header or SIGNATURE_HEADERS.get(
             gateway.config.provider.lower()
         )
-        signature = request.META.get(header_name, "") if header_name else ""
+        signature = (
+            request.META.get(_to_wsgi_meta_key(header_name), "") if header_name else ""
+        )
 
         try:
             gateway.verify_webhook(request.body, signature)

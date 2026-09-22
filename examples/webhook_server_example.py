@@ -26,15 +26,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from paystore import Gateway
 from paystore.core.exceptions import PaymentError
-
-# Header each provider sends its signature in, keyed by request.headers
-# (case-insensitive, so this doesn't need to match casing exactly).
-SIGNATURE_HEADERS = {
-    "paystack": "X-Paystack-Signature",
-    "flutterwave": "verif-hash",
-    "stripe": "Stripe-Signature",
-    "remita": "X-Remita-Signature",
-}
+from paystore.webhooks.headers import SIGNATURE_HEADERS
 
 
 def handle_verified_event(event: dict) -> None:
