@@ -194,7 +194,9 @@ shipped as a separate installable package in this repo.
 
 ## Documentation
 
-See the [docs](https://github.com/onwuagba/paystore-py/tree/main/docs) directory for full documentation.
+Start at [docs/index.md](https://github.com/onwuagba/paystore-py/blob/main/docs/index.md)
+for the full guide index — authentication, provider setup, webhooks,
+tokenization, refunds/subscriptions, and async usage.
 
 ## Contributing
 

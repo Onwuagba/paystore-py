@@ -92,4 +92,8 @@ if result['status'] == 'success':
 ## Next Steps
 
 - [Authentication Guide](guides/authentication.md) - Detailed authentication methods and security best practices
+- [Provider Reference](guides/providers.md) - Setup and quirks for Paystack, Flutterwave, Stripe, and Remita
 - [Tokenization Guide](guides/tokenization.md) - Save cards and charge them later
+- [Webhooks Guide](guides/webhooks.md) - Verify signatures and handle events
+- [Refunds and Recurring Billing](guides/refunds-and-subscriptions.md) - Refunds, native subscriptions, and the DIY loop pattern
+- [Async Usage](guides/async.md) - `AsyncGateway` for FastAPI and async Django
