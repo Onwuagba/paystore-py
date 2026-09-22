@@ -224,6 +224,28 @@ def test_verify_webhook_raises_for_invalid_signature(gateway_with_fake_provider)
         gateway.verify_webhook(b"payload", "bad-signature")
 
 
+def test_parse_webhook_event_returns_typed_event(gateway_with_fake_provider):
+    gateway, _ = gateway_with_fake_provider
+    payload = b'{"event": "charge.success", "data": {"reference": "TXN_1"}}'
+    event = gateway.parse_webhook_event(payload, "valid-signature")
+    assert event.provider == "paystack"
+    assert event.event_type == "charge.success"
+    assert event.data == {"reference": "TXN_1"}
+
+
+def test_parse_webhook_event_raises_for_invalid_signature(gateway_with_fake_provider):
+    gateway, _ = gateway_with_fake_provider
+    with pytest.raises(PaymentError):
+        gateway.parse_webhook_event(b"{}", "bad-signature")
+
+
+def test_parse_webhook_event_handles_malformed_json(gateway_with_fake_provider):
+    gateway, _ = gateway_with_fake_provider
+    event = gateway.parse_webhook_event(b"not json", "valid-signature")
+    assert event.raw == {}
+    assert event.event_type == "unknown"
+
+
 def test_initialize_rejects_invalid_email(gateway_with_fake_provider):
     gateway, fake = gateway_with_fake_provider
     with pytest.raises(ValidationError):

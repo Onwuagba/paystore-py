@@ -2,10 +2,13 @@
 
 import asyncio
 from functools import partial
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from paystore.core.config import Config
 from paystore.core.gateway import Gateway
+
+if TYPE_CHECKING:
+    from paystore.webhooks.events import WebhookEvent
 
 
 async def _run_sync(func: Any, *args: Any, **kwargs: Any) -> Any:
@@ -144,6 +147,11 @@ class AsyncGateway:
 
     async def verify_webhook(self, payload: bytes, signature: str) -> bool:
         return await _run_sync(self._gateway.verify_webhook, payload, signature)
+
+    async def parse_webhook_event(
+        self, payload: bytes, signature: str
+    ) -> "WebhookEvent":
+        return await _run_sync(self._gateway.parse_webhook_event, payload, signature)
 
     def supports(self, feature: str) -> bool:
         """Synchronous — just a dict lookup, no need to hop threads."""

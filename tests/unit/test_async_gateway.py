@@ -129,6 +129,17 @@ async def test_verify_webhook_raises_for_invalid_signature(
         await gateway.verify_webhook(b"payload", "bad-signature")
 
 
+@pytest.mark.asyncio
+async def test_parse_webhook_event_returns_typed_event(
+    async_gateway_with_fake_provider,
+):
+    gateway, _ = async_gateway_with_fake_provider
+    payload = b'{"event": "charge.success", "data": {"reference": "TXN_1"}}'
+    event = await gateway.parse_webhook_event(payload, "valid-signature")
+    assert event.event_type == "charge.success"
+    assert event.data == {"reference": "TXN_1"}
+
+
 def test_config_property_exposes_sync_gateways_config():
     gateway = AsyncGateway(provider="paystack", api_key="sk_test_key")
     assert gateway.config.provider == "paystack"

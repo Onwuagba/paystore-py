@@ -31,6 +31,28 @@ def handle_webhook(raw_body: bytes, signature: str):
 re-serialized/re-encoded copy of the JSON will fail even if the data
 looks identical, since signatures are computed over the raw bytes.
 
+## Parsing the event
+
+`verify_webhook` only tells you the signature is valid — you still had
+to parse the JSON and figure out the event type/relevant object
+yourself, and every provider shapes that differently (Paystack/
+Flutterwave use an `"event"` field with the payload under `"data"`;
+Stripe uses `"type"` with the object under `"data"."object"`).
+`parse_webhook_event` verifies and normalizes both in one call:
+
+```python
+event = gateway.parse_webhook_event(raw_body, signature)  # raises PaymentError if invalid
+
+print(event.event_type)  # e.g. "charge.success" (Paystack) / "checkout.session.completed" (Stripe)
+print(event.data)        # the normalized object — {"reference": ..., "status": ...} etc.
+print(event.raw)         # the full, unmodified parsed body — always available
+```
+
+`AsyncGateway` has the same method (`await gateway.parse_webhook_event(...)`).
+Remita's payload shape isn't well-documented enough to normalize
+confidently, so its events always come back with `event_type="unknown"`
+and `data` equal to `raw` — use `event.raw` directly for it.
+
 ## Where the signature comes from
 
 Each provider puts its signature in a different header. paystore ships

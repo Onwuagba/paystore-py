@@ -1,13 +1,16 @@
 """Main Gateway class."""
 
 import os
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from paystore.core.base_provider import BaseProvider
 from paystore.core.config import Config
 from paystore.core.exceptions import ConfigurationError
 from paystore.security.validation import validate_amount, validate_email
 from paystore.storage.base import BaseStorage, NoOpStorage
+
+if TYPE_CHECKING:
+    from paystore.webhooks.events import WebhookEvent
 
 
 class Gateway:
@@ -215,6 +218,26 @@ class Gateway:
         from paystore.webhooks.verifier import WebhookVerifier
 
         return WebhookVerifier(self._provider).verify(payload, signature)
+
+    def parse_webhook_event(self, payload: bytes, signature: str) -> "WebhookEvent":
+        """
+        Verify a webhook signature, then parse the payload into a typed
+        WebhookEvent (event_type/data normalized where possible, raw
+        always available). Raises PaymentError if the signature is
+        invalid, same as verify_webhook.
+        """
+        import json
+
+        from paystore.webhooks.events import WebhookEvent
+
+        self.verify_webhook(payload, signature)
+        try:
+            raw = json.loads(payload or b"{}")
+        except ValueError:
+            raw = {}
+        if not isinstance(raw, dict):
+            raw = {}
+        return WebhookEvent.from_raw(self.config.provider, raw)
 
     def supports(self, feature: str) -> bool:
         """
