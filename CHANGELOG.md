@@ -5,6 +5,43 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-22
+
+### Added
+- PayPal provider: OAuth2 client-credentials auth, Orders v2 for
+  initialize/verify (auto-captures approved orders), refunds, and
+  webhook signature verification (via PayPal's own verify API — see
+  [docs/guides/providers.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/providers.md#paypal)
+  for the multi-header signature shape it needs).
+- MTN Mobile Money (MoMo) provider: Collections API integration —
+  `initialize_payment` sends a Request to Pay prompt to the payer's
+  phone and returns immediately as `"pending"`; poll `verify_payment`
+  for the result. No saved-payment-method or webhook-signing support
+  (documented as intentionally unimplemented, not a gap — see
+  [docs/guides/providers.md](https://github.com/onwuagba/paystore-py/blob/main/docs/guides/providers.md#mtn-mobile-money-momo)).
+- `paystore.utils.currency.to_decimal_string()` — converts minor-unit
+  int amounts to the decimal-string format PayPal/MoMo expect.
+- `Gateway.transfers` / `AsyncGateway`: transfer/payout support for
+  Paystack and Flutterwave (`create_recipient`, `initiate`).
+- `Gateway.subaccounts`: split-payment subaccount creation for
+  Paystack and Flutterwave.
+- `paystore.webhooks.events.WebhookEvent` and
+  `Gateway.parse_webhook_event()` / `AsyncGateway.parse_webhook_event()`
+  — a typed, normalized webhook event shape instead of raw
+  provider-specific payloads.
+- `HTTPClient` now respects a `Retry-After` header on 429 responses
+  (capped at 30s) instead of always using exponential backoff.
+- `paystore-django`: `PaystoreAsyncWebhookView` for async Django
+  views, and `DjangoORMStorage` — a `BaseStorage` implementation that
+  persists transactions to a `PaystoreTransaction` model.
+- GitHub Pages documentation site, built from `/docs`:
+  https://onwuagba.github.io/paystore-py/
+
+### Fixed
+- `HTTPClient` no longer crashes on a 2xx response with an empty body
+  (e.g. MoMo's `requesttopay` 202 response) — returns `{}` instead of
+  failing on `response.json()`.
+
 ## [0.2.1] - 2026-09-22
 
 ### Fixed

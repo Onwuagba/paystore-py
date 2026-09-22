@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "paystore-django"
-version = "0.1.0"
+version = "0.2.0"
 description = "Django integration for paystore: settings-based Gateway factory and a webhook view"
 authors = ["Onwuagba <onwuagbakenenna@gmail.com>"]
 license = "MIT"
@@ -13,7 +13,7 @@ packages = [{ include = "paystore_django" }]
 [tool.poetry.dependencies]
 python = "^3.8"
 django = ">=3.2"
-paystore = "^0.2.0"
+paystore = ">=0.2.0,<0.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
