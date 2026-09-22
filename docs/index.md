@@ -12,7 +12,8 @@ switch gateways with a one-line change instead of a rewrite.
   `Config` objects), plus security best practices and deployment
   platform examples.
 - **[Provider Reference](guides/providers.md)** — setup, credentials,
-  and quirks for each of Paystack, Flutterwave, Stripe, and Remita.
+  and quirks for each of Paystack, Flutterwave, Stripe, Remita,
+  PayPal, and MTN Mobile Money.
 
 ## Features
 

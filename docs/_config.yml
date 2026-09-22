@@ -1,0 +1,4 @@
+theme: jekyll-theme-cayman
+title: Paystore
+description: A unified Python library for integrating multiple payment providers
+show_downloads: false
