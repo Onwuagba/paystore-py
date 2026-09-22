@@ -40,10 +40,27 @@ run against anything that looks like a live key.
 
 ## Releasing (maintainers)
 
+`paystore` core and `paystore-django` are separate PyPI projects released
+independently, each with its own version and git tag.
+
+### paystore (core)
+
 1. Bump the version in `pyproject.toml` and `paystore/__version__.py` (kept in sync).
 2. Update `CHANGELOG.md`.
 3. Merge to `main`, then create a GitHub Release with tag `vX.Y.Z` matching the version.
-4. Publishing `.github/workflows/publish.yml` builds and publishes to PyPI via
-   [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — no token needed in CI,
-   but the PyPI project must have this repo/workflow (`publish.yml`) registered as a
-   trusted publisher first, under a `pypi` GitHub Environment.
+4. `.github/workflows/publish.yml` builds and publishes to PyPI via
+   [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) on release — no token
+   needed in CI, but the PyPI project must have this repo/workflow (`publish.yml`)
+   registered as a trusted publisher first, under a `pypi` GitHub Environment.
+5. Manual fallback if Actions isn't available: `poetry build && poetry publish`
+   from the repo root (needs `poetry config pypi-token.pypi <token>` set locally first).
+
+### paystore-django
+
+Released the same way, from the `paystore-django/` directory, with its own
+version in `paystore-django/pyproject.toml` and a `paystore-django-vX.Y.Z`
+tag (to avoid colliding with core's `vX.Y.Z` tags in the same repo). It
+depends on a published `paystore` version (see its `pyproject.toml`), so
+bump core and publish it *first* if paystore-django needs a new core
+feature. No dedicated GitHub Actions publish workflow exists for it yet —
+publish manually: `cd paystore-django && poetry build && poetry publish`.

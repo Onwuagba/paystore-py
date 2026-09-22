@@ -13,11 +13,7 @@ packages = [{ include = "paystore_django" }]
 [tool.poetry.dependencies]
 python = "^3.8"
 django = ">=3.2"
-# NOTE: path dependency for local monorepo development only. Before
-# publishing this package to PyPI, switch this to a version constraint
-# (e.g. paystore = "^0.1.0") once paystore core itself is published —
-# pip installs can't resolve a local path.
-paystore = { path = "..", develop = true }
+paystore = "^0.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

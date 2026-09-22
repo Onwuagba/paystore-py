@@ -81,10 +81,9 @@ def on_webhook(sender, provider, event, **kwargs):
 
 ## Development
 
-This package lives in the same repo as `paystore` core and depends on it
-via a local path (see `pyproject.toml`) so changes to core are picked up
-immediately. Before publishing to PyPI, that path dependency needs to
-become a real version constraint once `paystore` itself is published.
+This package lives in the same repo as `paystore` core and depends on
+it as a normal published dependency (`paystore = "^0.2.0"` — see
+`pyproject.toml`), pulled from PyPI like any other requirement.
 
 ```bash
 poetry install

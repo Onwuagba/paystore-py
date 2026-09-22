@@ -238,18 +238,16 @@ name = "paystore"
 version = "0.2.0"
 description = "A unified Python library for integrating multiple payment providers"
 optional = false
-python-versions = "^3.8"
-files = []
-develop = true
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "paystore-0.2.0-py3-none-any.whl", hash = "sha256:9676b85d108534138ad86f3de6207a230670a53fabf075ec4a397b215f7c7548"},
+    {file = "paystore-0.2.0.tar.gz", hash = "sha256:a261367fccbe35a614c798769dfcfd32db51917c96ea25ec4a922a96f3097b1b"},
+]
 
 [package.dependencies]
-httpx = "^0.25.0"
-pydantic = "^2.0.0"
-python-dotenv = "^1.0.0"
-
-[package.source]
-type = "directory"
-url = ".."
+httpx = ">=0.25.0,<0.26.0"
+pydantic = ">=2.0.0,<3.0.0"
+python-dotenv = ">=1.0.0,<2.0.0"
 
 [[package]]
 name = "pluggy"
@@ -559,4 +557,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "ab553db74160795daf0f975aa6a9384db9d6a73fedfb086d229793502dbf4464"
+content-hash = "7a4d994678a6cd09d38c8a498246c98da664884866429e3695233fd5d26acfc2"
