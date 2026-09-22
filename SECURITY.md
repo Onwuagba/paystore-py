@@ -8,7 +8,7 @@ responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Instead, email **onwuagbakenenna@gmail.com** with:
+Instead, email **onwuagbakenenna[at]gmail.com** with:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce (a minimal repro is very helpful)
@@ -26,10 +26,12 @@ security fixes.
 ## Scope
 
 In scope:
+
 - The `paystore` core library and the `paystore-django` package in this
   repository.
 
 Out of scope:
+
 - Vulnerabilities in the payment providers' own APIs (Paystack,
   Flutterwave, Stripe, Remita) — report those to the provider directly.
 - Issues that require an attacker to already have your API keys or
