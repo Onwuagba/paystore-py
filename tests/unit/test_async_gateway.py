@@ -46,6 +46,22 @@ class _FakeProvider:
         self.calls.append(("verify_webhook_signature", (payload, signature)))
         return signature == "valid-signature"
 
+    def refund_payment(self, reference, amount=None, **kwargs):
+        self.calls.append(("refund_payment", (reference, amount, kwargs)))
+        return {"status": "processing"}
+
+    def create_plan(self, **kwargs):
+        self.calls.append(("create_plan", kwargs))
+        return {"plan_code": "PLN_1"}
+
+    def create_subscription(self, customer, plan, **kwargs):
+        self.calls.append(("create_subscription", (customer, plan, kwargs)))
+        return {"subscription_code": "SUB_1"}
+
+    def cancel_subscription(self, subscription_code, **kwargs):
+        self.calls.append(("cancel_subscription", (subscription_code, kwargs)))
+        return {"success": True}
+
 
 @pytest.fixture
 def async_gateway_with_fake_provider():
@@ -116,3 +132,30 @@ async def test_verify_webhook_raises_for_invalid_signature(
 def test_config_property_exposes_sync_gateways_config():
     gateway = AsyncGateway(provider="paystack", api_key="sk_test_key")
     assert gateway.config.provider == "paystack"
+
+
+@pytest.mark.asyncio
+async def test_refund_payment(async_gateway_with_fake_provider):
+    gateway, fake = async_gateway_with_fake_provider
+    result = await gateway.refund_payment("TXN_1", amount=200)
+    assert result["status"] == "processing"
+    assert fake.calls[0] == ("refund_payment", ("TXN_1", 200, {}))
+
+
+@pytest.mark.asyncio
+async def test_subscription_methods(async_gateway_with_fake_provider):
+    gateway, fake = async_gateway_with_fake_provider
+    await gateway.create_plan(name="Monthly", amount=5000, interval="monthly")
+    await gateway.subscribe(customer="CUS_1", plan="PLN_1")
+    await gateway.cancel_subscription("SUB_1")
+    assert [call[0] for call in fake.calls] == [
+        "create_plan",
+        "create_subscription",
+        "cancel_subscription",
+    ]
+
+
+def test_supports_delegates_to_sync_gateway():
+    gateway = AsyncGateway(provider="paystack", api_key="sk_test_key")
+    assert gateway.supports("refunds") is True
+    assert gateway.supports("time-travel") is False

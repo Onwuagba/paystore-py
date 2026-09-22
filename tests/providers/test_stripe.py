@@ -153,6 +153,91 @@ def test_list_customer_authorizations_maps_card_fields(provider, monkeypatch):
     assert result[0]["reusable"] is True
 
 
+def test_refund_payment_resolves_checkout_session_to_payment_intent(
+    provider, monkeypatch
+):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"id": "cs_test_1", "payment_intent": "pi_1"},
+    )
+    captured = {}
+
+    def fake_post_form(url, data, headers):
+        captured.update(data)
+        return {"id": "re_1", "status": "succeeded"}
+
+    monkeypatch.setattr(provider.client, "post_form", fake_post_form)
+    result = provider.refund_payment("cs_test_1")
+    assert result["reference"] == "re_1"
+    assert captured["payment_intent"] == "pi_1"
+
+
+def test_refund_payment_accepts_payment_intent_id_directly(provider, monkeypatch):
+    captured = {}
+
+    def fake_post_form(url, data, headers):
+        captured.update(data)
+        return {"id": "re_1", "status": "succeeded"}
+
+    monkeypatch.setattr(provider.client, "post_form", fake_post_form)
+    provider.refund_payment("pi_1", amount=200)
+    assert captured == {"payment_intent": "pi_1", "amount": 200}
+
+
+def test_refund_payment_raises_when_session_has_no_payment(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"id": "cs_test_1", "payment_intent": None},
+    )
+    with pytest.raises(ProviderError, match="no completed payment"):
+        provider.refund_payment("cs_test_1")
+
+
+def test_create_plan_creates_product_then_price(provider, monkeypatch):
+    calls = []
+
+    def fake_post_form(url, data, headers):
+        calls.append((url, data))
+        if "products" in url:
+            return {"id": "prod_1"}
+        return {"id": "price_1"}
+
+    monkeypatch.setattr(provider.client, "post_form", fake_post_form)
+    result = provider.create_plan(
+        name="Monthly", amount=5000, interval="month", currency="usd"
+    )
+    assert result["plan_code"] == "price_1"
+    assert calls[0][0].endswith("/products")
+    assert calls[1][0].endswith("/prices")
+    assert calls[1][1]["recurring[interval]"] == "month"
+    assert calls[1][1]["product"] == "prod_1"
+
+
+def test_create_subscription_maps_id_to_subscription_code(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post_form",
+        lambda url, data, headers: {"id": "sub_1", "status": "active"},
+    )
+    result = provider.create_subscription(customer="cus_1", plan="price_1")
+    assert result["subscription_code"] == "sub_1"
+
+
+def test_cancel_subscription_calls_delete(provider, monkeypatch):
+    captured = {}
+
+    def fake_delete(url, headers):
+        captured["url"] = url
+        return {"id": "sub_1", "status": "canceled"}
+
+    monkeypatch.setattr(provider.client, "delete", fake_delete)
+    result = provider.cancel_subscription("sub_1")
+    assert result["success"] is True
+    assert captured["url"].endswith("/subscriptions/sub_1")
+
+
 def test_verify_webhook_signature_valid(provider):
     payload = b'{"type": "checkout.session.completed"}'
     timestamp = str(int(time.time()))

@@ -21,11 +21,12 @@ class BaseProvider(ABC):
     SUPPORTED_FEATURES: FrozenSet[str] = frozenset()
     """
     Which optional features this provider implements. Valid values:
-    "charge_authorization", "customers", "tokens". A provider that
-    doesn't include a feature here should still override its methods to
-    raise NotImplementedError with a clear message (see the defaults
-    below) — SUPPORTED_FEATURES is for callers who want to check ahead
-    of time via Gateway.supports() instead of catching the exception.
+    "charge_authorization", "customers", "tokens", "refunds",
+    "subscriptions". A provider that doesn't include a feature here
+    should still override its methods to raise NotImplementedError with
+    a clear message (see the defaults below) — SUPPORTED_FEATURES is
+    for callers who want to check ahead of time via Gateway.supports()
+    instead of catching the exception.
     """
 
     def __init__(self, config: Config):
@@ -105,4 +106,47 @@ class BaseProvider(ABC):
         """Deactivate a payment token (optional implementation)."""
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support deactivating authorizations"
+        )
+
+    def refund_payment(
+        self, reference: str, amount: Optional[int] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Refund a payment (optional implementation).
+
+        Args:
+            reference: the reference returned by initialize_payment or
+                charge_authorization.
+            amount: partial refund amount (smallest currency unit); the
+                full amount is refunded if omitted.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not support refunds")
+
+    def create_plan(
+        self,
+        name: str,
+        amount: int,
+        interval: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Create a recurring billing plan (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support billing plans"
+        )
+
+    def create_subscription(
+        self, customer: str, plan: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Subscribe a customer to a plan (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support subscriptions"
+        )
+
+    def cancel_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Cancel a subscription (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support subscriptions"
         )

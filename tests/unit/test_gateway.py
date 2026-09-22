@@ -140,6 +140,22 @@ class _FakeProvider:
         self.calls.append(("verify_webhook_signature", (payload, signature)))
         return signature == "valid-signature"
 
+    def refund_payment(self, reference, amount=None, **kwargs):
+        self.calls.append(("refund_payment", (reference, amount, kwargs)))
+        return {"status": "processing"}
+
+    def create_plan(self, **kwargs):
+        self.calls.append(("create_plan", kwargs))
+        return {"plan_code": "PLN_1"}
+
+    def create_subscription(self, customer, plan, **kwargs):
+        self.calls.append(("create_subscription", (customer, plan, kwargs)))
+        return {"subscription_code": "SUB_1"}
+
+    def cancel_subscription(self, subscription_code, **kwargs):
+        self.calls.append(("cancel_subscription", (subscription_code, kwargs)))
+        return {"success": True}
+
 
 @pytest.fixture
 def gateway_with_fake_provider(monkeypatch):
@@ -291,3 +307,66 @@ def test_gateway_defaults_to_noop_storage():
     gateway._provider = _FakeProvider()
     # Should not raise even though nothing was passed for `storage`.
     gateway.payments.verify("TXN_1")
+
+
+def test_refund_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    result = gateway.payments.refund("TXN_1")
+    assert result["status"] == "processing"
+    assert fake.calls == [("refund_payment", ("TXN_1", None, {}))]
+
+
+def test_refund_partial_validates_and_passes_amount(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.payments.refund("TXN_1", amount=200)
+    assert fake.calls == [("refund_payment", ("TXN_1", 200, {}))]
+
+
+def test_refund_rejects_invalid_amount(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.payments.refund("TXN_1", amount=-5)
+    assert fake.calls == []
+
+
+def test_refund_saves_result_through_storage():
+    fake_storage = _FakeStorage()
+    gateway = Gateway(provider="paystack", api_key="sk_test_key", storage=fake_storage)
+    gateway._provider = _FakeProvider()
+    gateway.payments.refund("TXN_1")
+    assert fake_storage.saved == [{"status": "processing"}]
+
+
+def test_subscriptions_facade_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.subscriptions.create_plan(name="Monthly", amount=5000, interval="monthly")
+    gateway.subscriptions.subscribe(customer="CUS_1", plan="PLN_1")
+    gateway.subscriptions.cancel("SUB_1")
+    assert [call[0] for call in fake.calls] == [
+        "create_plan",
+        "create_subscription",
+        "cancel_subscription",
+    ]
+
+
+def test_subscriptions_create_plan_validates_amount(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    with pytest.raises(ValidationError):
+        gateway.subscriptions.create_plan(name="Monthly", amount=-1, interval="monthly")
+    assert fake.calls == []
+
+
+@pytest.mark.parametrize(
+    "provider,feature,expected",
+    [
+        ("paystack", "refunds", True),
+        ("paystack", "subscriptions", True),
+        ("flutterwave", "refunds", True),
+        ("flutterwave", "subscriptions", False),
+        ("stripe", "refunds", True),
+        ("stripe", "subscriptions", True),
+    ],
+)
+def test_gateway_supports_refunds_and_subscriptions(provider, feature, expected):
+    gateway = Gateway(provider=provider, api_key="test_key")
+    assert gateway.supports(feature) is expected

@@ -101,5 +101,50 @@ class AsyncGateway:
     async def deactivate_token(self, authorization_code: str) -> Dict[str, Any]:
         return await _run_sync(self._gateway.tokens.deactivate, authorization_code)
 
+    async def refund_payment(
+        self, reference: str, amount: Optional[int] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        return await _run_sync(
+            self._gateway.payments.refund, reference, amount=amount, **kwargs
+        )
+
+    async def create_plan(
+        self,
+        name: str,
+        amount: int,
+        interval: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        return await _run_sync(
+            self._gateway.subscriptions.create_plan,
+            name=name,
+            amount=amount,
+            interval=interval,
+            currency=currency,
+            **kwargs,
+        )
+
+    async def subscribe(
+        self, customer: str, plan: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        return await _run_sync(
+            self._gateway.subscriptions.subscribe,
+            customer=customer,
+            plan=plan,
+            **kwargs,
+        )
+
+    async def cancel_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        return await _run_sync(
+            self._gateway.subscriptions.cancel, subscription_code, **kwargs
+        )
+
     async def verify_webhook(self, payload: bytes, signature: str) -> bool:
         return await _run_sync(self._gateway.verify_webhook, payload, signature)
+
+    def supports(self, feature: str) -> bool:
+        """Synchronous — just a dict lookup, no need to hop threads."""
+        return self._gateway.supports(feature)

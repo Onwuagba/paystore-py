@@ -79,3 +79,58 @@ def test_verify_webhook_signature_requires_webhook_secret(flutterwave_config):
 def test_create_customer_not_implemented(provider):
     with pytest.raises(NotImplementedError):
         provider.create_customer(email="a@example.com")
+
+
+def test_refund_payment_resolves_id_then_refunds(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {
+            "status": "success",
+            "data": {"id": 998877, "tx_ref": "TXN_1", "status": "successful"},
+        },
+    )
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured["url"] = url
+        captured["data"] = data
+        return {"status": "success", "data": {"status": "completed"}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.refund_payment("TXN_1")
+    assert result["status"] == "completed"
+    assert captured["url"].endswith("/transactions/998877/refund")
+    assert captured["data"] == {}
+
+
+def test_refund_payment_partial_includes_amount(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"status": "success", "data": {"id": 998877}},
+    )
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": "success", "data": {}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    provider.refund_payment("TXN_1", amount=200)
+    assert captured == {"amount": 200}
+
+
+def test_refund_payment_raises_when_id_missing(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"status": "success", "data": {}},
+    )
+    with pytest.raises(ProviderError, match="Could not resolve transaction id"):
+        provider.refund_payment("TXN_1")
+
+
+def test_create_plan_not_implemented(provider):
+    with pytest.raises(NotImplementedError):
+        provider.create_plan(name="Monthly", amount=5000, interval="monthly")

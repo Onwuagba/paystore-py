@@ -58,10 +58,18 @@ class StripeProvider(BaseProvider):
     Uses Checkout Sessions for `initialize_payment` so the return shape
     (authorization_url/reference) matches the other providers. Note that
     Stripe does not support NGN; pass a currency Stripe supports (e.g. USD).
+
+    `amount` is always the smallest currency unit (e.g. cents for USD),
+    same as the other providers — except for zero-decimal currencies
+    (JPY, KRW, etc.), where the smallest unit *is* the major unit; see
+    paystore.utils.currency.is_zero_decimal_currency. Passing 500 for a
+    JPY charge means ¥500, not ¥5.00.
     """
 
     BASE_URL = "https://api.stripe.com/v1"
-    SUPPORTED_FEATURES = frozenset({"charge_authorization", "customers", "tokens"})
+    SUPPORTED_FEATURES = frozenset(
+        {"charge_authorization", "customers", "tokens", "refunds", "subscriptions"}
+    )
 
     def __init__(self, config):
         super().__init__(config)
@@ -90,6 +98,13 @@ class StripeProvider(BaseProvider):
     def _get(self, path: str) -> Dict[str, Any]:
         url = f"{self.BASE_URL}/{path}"
         response = self.client.get(url, headers=self._get_headers())
+        if "error" in response:
+            raise ProviderError(response["error"].get("message", "Stripe API error"))
+        return response
+
+    def _delete(self, path: str) -> Dict[str, Any]:
+        url = f"{self.BASE_URL}/{path}"
+        response = self.client.delete(url, headers=self._get_headers())
         if "error" in response:
             raise ProviderError(response["error"].get("message", "Stripe API error"))
         return response
@@ -267,6 +282,104 @@ class StripeProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to deactivate authorization: {e}") from e
+
+    def refund_payment(
+        self, reference: str, amount: Optional[int] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Refund a Stripe payment, in full or in part.
+
+        `reference` may be either a Checkout Session id ("cs_...", from
+        initialize_payment — looked up to find its PaymentIntent) or a
+        PaymentIntent id directly ("pi_...", as returned by
+        charge_authorization).
+        """
+        try:
+            payment_intent: Any = reference
+            if reference.startswith("cs_"):
+                session = self._get(f"checkout/sessions/{reference}")
+                payment_intent = session.get("payment_intent")
+                if not payment_intent:
+                    raise ProviderError(
+                        f"Checkout session {reference!r} has no completed payment"
+                    )
+
+            payload: Dict[str, Any] = {"payment_intent": payment_intent, **kwargs}
+            if amount is not None:
+                payload["amount"] = amount
+
+            data = self._post("refunds", payload)
+            return {**data, "reference": data.get("id")}
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to refund payment: {e}") from e
+
+    def create_plan(
+        self,
+        name: str,
+        amount: int,
+        interval: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Create a recurring Price (Stripe has no separate "plan" object
+        since API version 2018-02-05; a Price with `recurring` set is
+        the modern equivalent).
+
+        interval: one of Stripe's interval values — "day", "week",
+        "month", "year" (unlike Paystack's "daily"/"weekly"/etc — these
+        are passed straight through, not translated between providers).
+        """
+        try:
+            product = self._post("products", {"name": name})
+            price = self._post(
+                "prices",
+                {
+                    "unit_amount": amount,
+                    "currency": currency.lower(),
+                    "recurring": {"interval": interval},
+                    "product": product.get("id"),
+                    **kwargs,
+                },
+            )
+            return {**price, "plan_code": price.get("id")}
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create plan: {e}") from e
+
+    def create_subscription(
+        self, customer: str, plan: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Subscribe a customer to a Price.
+
+        customer: Stripe customer id. plan: a Price id (from create_plan).
+        """
+        try:
+            data = self._post(
+                "subscriptions",
+                {"customer": customer, "items": [{"price": plan}], **kwargs},
+            )
+            return {**data, "subscription_code": data.get("id")}
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create subscription: {e}") from e
+
+    def cancel_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Cancel a Stripe subscription immediately."""
+        try:
+            data = self._delete(f"subscriptions/{subscription_code}")
+            return {"success": True, **data}
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to cancel subscription: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """

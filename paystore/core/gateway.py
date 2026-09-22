@@ -191,6 +191,11 @@ class Gateway:
         """Access tokenization operations."""
         return TokenOperations(self._provider)
 
+    @property
+    def subscriptions(self) -> "SubscriptionOperations":
+        """Access recurring billing (plans/subscriptions) operations."""
+        return SubscriptionOperations(self._provider)
+
     def verify_webhook(self, payload: bytes, signature: str) -> bool:
         """
         Verify a webhook signature for this gateway's provider.
@@ -207,9 +212,10 @@ class Gateway:
         instead of calling it and catching NotImplementedError.
 
         Args:
-            feature: one of "charge_authorization", "customers", "tokens".
-                initialize/verify/webhook verification are supported by
-                every provider and aren't part of this check.
+            feature: one of "charge_authorization", "customers", "tokens",
+                "refunds", "subscriptions". initialize/verify/webhook
+                verification are supported by every provider and aren't
+                part of this check.
 
         Example:
             >>> if gateway.supports("customers"):
@@ -264,6 +270,43 @@ class TokenOperations:
     def deactivate(self, authorization_code: str) -> Dict[str, Any]:
         """Deactivate/delete a payment token."""
         return self._provider.deactivate_authorization(authorization_code)
+
+
+class SubscriptionOperations:
+    """Recurring billing (plans/subscriptions) operations."""
+
+    def __init__(self, provider: BaseProvider):
+        self._provider = provider
+
+    def create_plan(
+        self,
+        name: str,
+        amount: int,
+        interval: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Create a recurring billing plan.
+
+        `interval`'s valid values are provider-specific (e.g. Paystack
+        wants "monthly", Stripe wants "month") and are passed straight
+        through — check the active provider's docs/docstring.
+        """
+        validate_amount(amount)
+        return self._provider.create_plan(
+            name=name, amount=amount, interval=interval, currency=currency, **kwargs
+        )
+
+    def subscribe(self, customer: str, plan: str, **kwargs: Any) -> Dict[str, Any]:
+        """Subscribe a customer (customer code/id) to a plan (plan code/id)."""
+        return self._provider.create_subscription(
+            customer=customer, plan=plan, **kwargs
+        )
+
+    def cancel(self, subscription_code: str, **kwargs: Any) -> Dict[str, Any]:
+        """Cancel a subscription."""
+        return self._provider.cancel_subscription(subscription_code, **kwargs)
 
 
 class PaymentOperations:
@@ -344,5 +387,23 @@ class PaymentOperations:
 
         if idempotency_key:
             self._idempotency_cache[idempotency_key] = result
+        self._storage.save_transaction(result)
+        return result
+
+    def refund(
+        self, reference: str, amount: Optional[int] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Refund a payment, in full or in part.
+
+        Args:
+            reference: the reference returned by initialize/
+                charge_authorization (or verify).
+            amount: partial refund amount (smallest currency unit); the
+                full amount is refunded if omitted.
+        """
+        if amount is not None:
+            validate_amount(amount)
+        result = self._provider.refund_payment(reference, amount=amount, **kwargs)
         self._storage.save_transaction(result)
         return result

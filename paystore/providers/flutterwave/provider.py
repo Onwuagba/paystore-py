@@ -27,10 +27,17 @@ class FlutterwaveProvider(BaseProvider):
     implemented and raise NotImplementedError (see BaseProvider defaults).
     Recurring charges are still supported via charge_authorization, which
     uses the card token returned in a verified transaction's payload.
+
+    Flutterwave's "Payment Plans" attach recurring billing to a regular
+    initialize_payment call (via a payment_plan kwarg) rather than
+    exposing a separate create-subscription/cancel-subscription API per
+    customer the way Paystack/Stripe do, so create_plan/
+    create_subscription/cancel_subscription aren't implemented here
+    either — use `initialize_payment(..., payment_plan=plan_id)` instead.
     """
 
     BASE_URL = "https://api.flutterwave.com/v3"
-    SUPPORTED_FEATURES = frozenset({"charge_authorization"})
+    SUPPORTED_FEATURES = frozenset({"charge_authorization", "refunds"})
 
     def __init__(self, config):
         super().__init__(config)
@@ -145,6 +152,38 @@ class FlutterwaveProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to charge authorization: {e}") from e
+
+    def refund_payment(
+        self, reference: str, amount: Optional[int] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Refund a Flutterwave transaction, in full or in part.
+
+        Flutterwave's refund endpoint is keyed by its own numeric
+        transaction id, not tx_ref, so this looks the transaction up by
+        reference first (one extra request) to resolve it.
+        """
+        try:
+            transaction = self.verify_payment(reference)
+            transaction_id = transaction.get("id")
+            if not transaction_id:
+                raise ProviderError(
+                    f"Could not resolve transaction id for {reference!r}"
+                )
+
+            url = f"{self.BASE_URL}/transactions/{transaction_id}/refund"
+            payload: Dict[str, Any] = {**kwargs}
+            if amount is not None:
+                payload["amount"] = amount
+
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status") == "success":
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Refund failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to refund payment: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """

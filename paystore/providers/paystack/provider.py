@@ -13,7 +13,9 @@ class PaystackProvider(BaseProvider):
     """Paystack payment provider."""
 
     BASE_URL = "https://api.paystack.co"
-    SUPPORTED_FEATURES = frozenset({"charge_authorization", "customers", "tokens"})
+    SUPPORTED_FEATURES = frozenset(
+        {"charge_authorization", "customers", "tokens", "refunds", "subscriptions"}
+    )
 
     def __init__(self, config):
         super().__init__(config)
@@ -183,6 +185,116 @@ class PaystackProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to deactivate authorization: {e}") from e
+
+    def refund_payment(
+        self, reference: str, amount: Optional[int] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """Refund a Paystack transaction, in full or in part."""
+        url = f"{self.BASE_URL}/refund"
+
+        payload: Dict[str, Any] = {"transaction": reference, **kwargs}
+        if amount is not None:
+            payload["amount"] = amount
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status"):
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Refund failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to refund payment: {e}") from e
+
+    def create_plan(
+        self,
+        name: str,
+        amount: int,
+        interval: str,
+        currency: str = "NGN",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Create a Paystack billing plan.
+
+        interval: one of "hourly", "daily", "weekly", "monthly",
+        "quarterly", "biannually", "annually".
+        """
+        url = f"{self.BASE_URL}/plan"
+        payload = {
+            "name": name,
+            "amount": amount,
+            "interval": interval,
+            "currency": currency,
+            **kwargs,
+        }
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status"):
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Plan creation failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create plan: {e}") from e
+
+    def create_subscription(
+        self, customer: str, plan: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Subscribe a customer to a plan.
+
+        customer: customer code or email. Pass authorization_code as a
+        kwarg to pick a specific saved card; otherwise Paystack uses the
+        customer's most recent successful authorization.
+        """
+        url = f"{self.BASE_URL}/subscription"
+        payload = {"customer": customer, "plan": plan, **kwargs}
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status"):
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Subscription failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create subscription: {e}") from e
+
+    def cancel_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Cancel a Paystack subscription.
+
+        Paystack's disable endpoint requires an email_token in addition
+        to the subscription code, so this fetches the subscription first
+        to retrieve it.
+        """
+        try:
+            subscription = self.client.get(
+                f"{self.BASE_URL}/subscription/{subscription_code}",
+                headers=self._get_headers(),
+            )
+            if not subscription.get("status"):
+                raise ProviderError(
+                    subscription.get("message", "Subscription not found")
+                )
+            email_token = subscription.get("data", {}).get("email_token")
+
+            response = self.client.post(
+                f"{self.BASE_URL}/subscription/disable",
+                data={"code": subscription_code, "token": email_token, **kwargs},
+                headers=self._get_headers(),
+            )
+            if response.get("status"):
+                return {"success": True, "message": response.get("message")}
+            raise ProviderError(response.get("message", "Cancellation failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to cancel subscription: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """Verify Paystack webhook signature."""

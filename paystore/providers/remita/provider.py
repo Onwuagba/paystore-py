@@ -25,7 +25,14 @@ _SUCCESS_STATUS_CODES = {"00", "01"}
 
 
 class RemitaProvider(BaseProvider):
-    """Remita payment provider (RRR-based collections flow)."""
+    """
+    Remita payment provider (RRR-based collections flow).
+
+    No charge_authorization, customer management, refunds, or
+    subscriptions — Remita's collections product doesn't expose a clean
+    equivalent for any of these (refunds and recurring billing go
+    through separate Remita products not covered here).
+    """
 
     SUPPORTED_FEATURES = frozenset()  # no optional features
 

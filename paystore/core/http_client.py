@@ -73,6 +73,17 @@ class HTTPClient:
             "GET", url, lambda: self.client.get(url, headers=headers), retries=2
         )
 
+    def delete(
+        self,
+        url: str,
+        data: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """Make DELETE request. Not retried automatically (has side effects)."""
+        return self._send(
+            "DELETE", url, lambda: self.client.delete(url, params=data, headers=headers)
+        )
+
     def _send(
         self,
         method: str,

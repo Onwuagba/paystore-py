@@ -173,6 +173,92 @@ def test_initialize_payment_passes_through_specific_exception_type(
         provider.initialize_payment(amount=1000, email="a@example.com")
 
 
+def test_refund_payment_full(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": True, "data": {"status": "processing"}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.refund_payment("TXN_1")
+    assert result["status"] == "processing"
+    assert captured == {"transaction": "TXN_1"}
+
+
+def test_refund_payment_partial_includes_amount(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": True, "data": {"status": "processing"}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    provider.refund_payment("TXN_1", amount=500)
+    assert captured == {"transaction": "TXN_1", "amount": 500}
+
+
+def test_refund_payment_raises_on_failure(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": False, "message": "Already refunded"},
+    )
+    with pytest.raises(ProviderError, match="Already refunded"):
+        provider.refund_payment("TXN_1")
+
+
+def test_create_plan_success(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": True, "data": {"plan_code": "PLN_1"}},
+    )
+    result = provider.create_plan(name="Monthly", amount=5000, interval="monthly")
+    assert result["plan_code"] == "PLN_1"
+
+
+def test_create_subscription_success(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {
+            "status": True,
+            "data": {"subscription_code": "SUB_1"},
+        },
+    )
+    result = provider.create_subscription(customer="CUS_1", plan="PLN_1")
+    assert result["subscription_code"] == "SUB_1"
+
+
+def test_cancel_subscription_success(provider, monkeypatch):
+    def fake_get(url, headers):
+        return {"status": True, "data": {"email_token": "tok_abc"}}
+
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": True, "message": "Subscription disabled"}
+
+    monkeypatch.setattr(provider.client, "get", fake_get)
+    monkeypatch.setattr(provider.client, "post", fake_post)
+
+    result = provider.cancel_subscription("SUB_1")
+    assert result == {"success": True, "message": "Subscription disabled"}
+    assert captured == {"code": "SUB_1", "token": "tok_abc"}
+
+
+def test_cancel_subscription_raises_when_not_found(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"status": False, "message": "Subscription not found"},
+    )
+    with pytest.raises(ProviderError, match="Subscription not found"):
+        provider.cancel_subscription("unknown")
+
+
 def test_verify_webhook_signature_valid(provider):
     payload = b'{"event": "charge.success"}'
     signature = hmac.new(
