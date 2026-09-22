@@ -1,6 +1,6 @@
 # paystore-django
 
-Django integration for [paystore](https://github.com/onwuagba/paystore):
+Django integration for [paystore](https://github.com/onwuagba/paystore-py):
 a settings-based `Gateway` factory and a ready-to-subclass webhook view.
 
 ## Installation

@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "paystore"
-version = "0.1.0"
+version = "0.2.0"
 description = "A unified Python library for integrating multiple payment providers"
 authors = ["Onwuagba <onwuagbakenenna@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/onwuagba/paystore"
-repository = "https://github.com/onwuagba/paystore"
-documentation = "https://github.com/onwuagba/paystore/tree/main/docs"
+homepage = "https://github.com/onwuagba/paystore-py"
+repository = "https://github.com/onwuagba/paystore-py"
+documentation = "https://github.com/onwuagba/paystore-py/tree/main/docs"
 keywords = ["payment", "gateway", "paystack", "flutterwave", "stripe"]
 include = ["paystore/py.typed"]
 classifiers = [

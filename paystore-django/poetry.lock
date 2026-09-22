@@ -235,7 +235,7 @@ files = [
 
 [[package]]
 name = "paystore"
-version = "0.1.0"
+version = "0.2.0"
 description = "A unified Python library for integrating multiple payment providers"
 optional = false
 python-versions = "^3.8"

@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
 ### Added
 - Flutterwave, Stripe, and Remita providers, so `Gateway(provider=...)` can
   target Paystack, Flutterwave, Stripe, or Remita interchangeably.

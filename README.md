@@ -24,19 +24,22 @@ switching gateways is a one-line change instead of a rewrite.
 ## Installation
 
 ### Using pip (recommended for users)
+
 ```bash
 pip install paystore
 ```
 
 ### Using Poetry (recommended for contributors)
+
 ```bash
 poetry add paystore
 ```
 
 ### From source
+
 ```bash
-git clone https://github.com/onwuagba/paystore.git
-cd paystore
+git clone https://github.com/onwuagba/paystore-py.git
+cd paystore-py
 
 # With Poetry
 poetry install
@@ -84,15 +87,15 @@ gateway = Gateway(
 
 ## Provider Support
 
-| Capability | Paystack | Flutterwave | Stripe | Remita |
-|---|---|---|---|---|
-| Initialize / verify payment | ✅ | ✅ | ✅ | ✅ |
-| Charge saved card (`charge_authorization`) | ✅ | ✅ | ✅ | ❌ |
-| Webhook signature verification | ✅ | ✅ | ✅ | ✅ |
-| Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ |
-| List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ |
-| Refunds (`gateway.payments.refund`) | ✅ | ✅ | ✅ | ❌ |
-| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ |
+| Capability                                       | Paystack | Flutterwave | Stripe | Remita |
+| ------------------------------------------------ | -------- | ----------- | ------ | ------ |
+| Initialize / verify payment                      | ✅       | ✅          | ✅     | ✅     |
+| Charge saved card (`charge_authorization`)     | ✅       | ✅          | ✅     | ❌     |
+| Webhook signature verification                   | ✅       | ✅          | ✅     | ✅     |
+| Customer management (`gateway.customers`)      | ✅       | ❌          | ✅     | ❌     |
+| List/deactivate saved cards (`gateway.tokens`) | ✅       | ❌          | ✅     | ❌     |
+| Refunds (`gateway.payments.refund`)            | ✅       | ✅          | ✅     | ❌     |
+| Recurring billing (`gateway.subscriptions`)    | ✅       | ❌          | ✅     | ❌     |
 
 Check a provider's support in code instead of catching
 `NotImplementedError`:
@@ -103,6 +106,7 @@ if gateway.supports("customers"):
 ```
 
 Notes:
+
 - Flutterwave has no first-class "saved customer" API comparable to
   Paystack's or Stripe's, so `gateway.customers` and `gateway.tokens`
   raise `NotImplementedError` for that provider; recurring charges still

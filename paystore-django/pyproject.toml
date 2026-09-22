@@ -5,8 +5,8 @@ description = "Django integration for paystore: settings-based Gateway factory a
 authors = ["Onwuagba <onwuagbakenenna@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/onwuagba/paystore"
-repository = "https://github.com/onwuagba/paystore"
+homepage = "https://github.com/onwuagba/paystore-py"
+repository = "https://github.com/onwuagba/paystore-py"
 keywords = ["payment", "gateway", "django", "paystack", "flutterwave", "stripe"]
 packages = [{ include = "paystore_django" }]
 
