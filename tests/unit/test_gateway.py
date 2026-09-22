@@ -164,6 +164,10 @@ class _FakeProvider:
         self.calls.append(("initiate_transfer", kwargs))
         return {"transfer_code": "TRF_1"}
 
+    def create_subaccount(self, **kwargs):
+        self.calls.append(("create_subaccount", kwargs))
+        return {"subaccount_code": "ACCT_1"}
+
 
 @pytest.fixture
 def gateway_with_fake_provider(monkeypatch):
@@ -383,18 +387,29 @@ def test_transfers_initiate_validates_amount(gateway_with_fake_provider):
     assert fake.calls == []
 
 
+def test_subaccounts_facade_delegates_to_provider(gateway_with_fake_provider):
+    gateway, fake = gateway_with_fake_provider
+    gateway.subaccounts.create(
+        business_name="Shop", account_number="0123456789", bank_code="058"
+    )
+    assert [call[0] for call in fake.calls] == ["create_subaccount"]
+
+
 @pytest.mark.parametrize(
     "provider,feature,expected",
     [
         ("paystack", "refunds", True),
         ("paystack", "subscriptions", True),
         ("paystack", "transfers", True),
+        ("paystack", "split_payments", True),
         ("flutterwave", "refunds", True),
         ("flutterwave", "subscriptions", False),
         ("flutterwave", "transfers", True),
+        ("flutterwave", "split_payments", True),
         ("stripe", "refunds", True),
         ("stripe", "subscriptions", True),
         ("stripe", "transfers", False),
+        ("stripe", "split_payments", False),
     ],
 )
 def test_gateway_supports_refunds_and_subscriptions(provider, feature, expected):

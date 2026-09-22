@@ -22,8 +22,9 @@ class BaseProvider(ABC):
     """
     Which optional features this provider implements. Valid values:
     "charge_authorization", "customers", "tokens", "refunds",
-    "subscriptions", "transfers". A provider that doesn't include a feature here
-    should still override its methods to raise NotImplementedError with
+    "subscriptions", "transfers", "split_payments". A provider that
+    doesn't include a feature here should still override its methods to
+    raise NotImplementedError with
     a clear message (see the defaults below) — SUPPORTED_FEATURES is
     for callers who want to check ahead of time via Gateway.supports()
     instead of catching the exception.
@@ -186,4 +187,23 @@ class BaseProvider(ABC):
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support transfers"
+        )
+
+    def create_subaccount(
+        self,
+        business_name: str,
+        account_number: str,
+        bank_code: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Create a subaccount for split payments (optional
+        implementation) — a portion of each payment routed to this
+        recipient automatically. Once created, pass the returned
+        subaccount id/code to initialize_payment via a provider-
+        specific kwarg (e.g. Paystack's `subaccount`, Flutterwave's
+        `subaccounts`) — see each provider's docstring.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support split payments"
         )

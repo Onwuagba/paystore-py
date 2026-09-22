@@ -312,6 +312,34 @@ def test_initiate_transfer_raises_on_failure(provider, monkeypatch):
         provider.initiate_transfer(recipient="RCP_1", amount=5000)
 
 
+def test_create_subaccount_success(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": True, "data": {"subaccount_code": "ACCT_1"}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.create_subaccount(
+        business_name="Shop", account_number="0123456789", bank_code="058"
+    )
+    assert result["subaccount_code"] == "ACCT_1"
+    assert captured["settlement_bank"] == "058"
+    assert captured["percentage_charge"] == 0
+
+
+def test_create_subaccount_raises_on_failure(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": False, "message": "Invalid bank"},
+    )
+    with pytest.raises(ProviderError, match="Invalid bank"):
+        provider.create_subaccount(
+            business_name="Shop", account_number="0123456789", bank_code="000"
+        )
+
+
 def test_verify_webhook_signature_valid(provider):
     payload = b'{"event": "charge.success"}'
     signature = hmac.new(

@@ -201,6 +201,11 @@ class Gateway:
         """Access transfer/payout operations."""
         return TransferOperations(self._provider)
 
+    @property
+    def subaccounts(self) -> "SubaccountOperations":
+        """Access split-payment (subaccount) operations."""
+        return SubaccountOperations(self._provider)
+
     def verify_webhook(self, payload: bytes, signature: str) -> bool:
         """
         Verify a webhook signature for this gateway's provider.
@@ -218,9 +223,10 @@ class Gateway:
 
         Args:
             feature: one of "charge_authorization", "customers", "tokens",
-                "refunds", "subscriptions", "transfers". initialize/
-                verify/webhook verification are supported by every
-                provider and aren't part of this check.
+                "refunds", "subscriptions", "transfers",
+                "split_payments". initialize/verify/webhook
+                verification are supported by every provider and aren't
+                part of this check.
 
         Example:
             >>> if gateway.supports("customers"):
@@ -364,6 +370,31 @@ class TransferOperations:
             amount=amount,
             reason=reason,
             currency=currency,
+            **kwargs,
+        )
+
+
+class SubaccountOperations:
+    """Split-payment (subaccount) operations."""
+
+    def __init__(self, provider: BaseProvider):
+        self._provider = provider
+
+    def create(
+        self, business_name: str, account_number: str, bank_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Create a subaccount for split payments.
+
+        Once created, pass the returned subaccount id/code to
+        gateway.payments.initialize(...) via a provider-specific kwarg
+        (e.g. Paystack's `subaccount`, Flutterwave's `subaccounts`) —
+        see the active provider's docstring for the exact shape.
+        """
+        return self._provider.create_subaccount(
+            business_name=business_name,
+            account_number=account_number,
+            bank_code=bank_code,
             **kwargs,
         )
 

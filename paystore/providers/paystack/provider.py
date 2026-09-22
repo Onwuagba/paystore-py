@@ -10,7 +10,14 @@ from paystore.core.http_client import HTTPClient
 
 
 class PaystackProvider(BaseProvider):
-    """Paystack payment provider."""
+    """
+    Paystack payment provider.
+
+    Split payments: after create_subaccount() returns a
+    subaccount_code, pass it to initialize_payment via the `subaccount`
+    kwarg (optionally `transaction_charge`/`bearer` too) to route part
+    of the payment to that subaccount automatically.
+    """
 
     BASE_URL = "https://api.paystack.co"
     SUPPORTED_FEATURES = frozenset(
@@ -21,6 +28,7 @@ class PaystackProvider(BaseProvider):
             "refunds",
             "subscriptions",
             "transfers",
+            "split_payments",
         }
     )
 
@@ -365,6 +373,34 @@ class PaystackProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to initiate transfer: {e}") from e
+
+    def create_subaccount(
+        self, business_name: str, account_number: str, bank_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Create a subaccount for split payments.
+
+        Use the returned subaccount_code as the `subaccount` kwarg to
+        initialize_payment.
+        """
+        url = f"{self.BASE_URL}/subaccount"
+        payload = {
+            "business_name": business_name,
+            "account_number": account_number,
+            "settlement_bank": bank_code,
+            "percentage_charge": kwargs.pop("percentage_charge", 0),
+            **kwargs,
+        }
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status"):
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Subaccount creation failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create subaccount: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """Verify Paystack webhook signature."""

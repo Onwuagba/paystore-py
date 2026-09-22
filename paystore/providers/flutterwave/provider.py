@@ -39,10 +39,16 @@ class FlutterwaveProvider(BaseProvider):
     Paystack's do — create_transfer_recipient isn't implemented;
     initiate_transfer takes bank account details directly (see its
     docstring).
+
+    Split payments: after create_subaccount() returns an id, pass it
+    to initialize_payment via the `subaccounts` kwarg, e.g.
+    `subaccounts=[{"id": subaccount_id, "transaction_split_ratio": 20}]`.
     """
 
     BASE_URL = "https://api.flutterwave.com/v3"
-    SUPPORTED_FEATURES = frozenset({"charge_authorization", "refunds", "transfers"})
+    SUPPORTED_FEATURES = frozenset(
+        {"charge_authorization", "refunds", "transfers", "split_payments"}
+    )
 
     def __init__(self, config):
         super().__init__(config)
@@ -230,6 +236,35 @@ class FlutterwaveProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to initiate transfer: {e}") from e
+
+    def create_subaccount(
+        self, business_name: str, account_number: str, bank_code: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Create a subaccount for split payments.
+
+        Use the returned id as `subaccounts=[{"id": ..., "transaction_split_ratio": N}]`
+        in initialize_payment.
+        """
+        url = f"{self.BASE_URL}/subaccounts"
+        payload = {
+            "account_bank": bank_code,
+            "account_number": account_number,
+            "business_name": business_name,
+            "split_type": kwargs.pop("split_type", "percentage"),
+            "split_value": kwargs.pop("split_value", 0),
+            **kwargs,
+        }
+
+        try:
+            response = self.client.post(url, data=payload, headers=self._get_headers())
+            if response.get("status") == "success":
+                return response.get("data", {})
+            raise ProviderError(response.get("message", "Subaccount creation failed"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create subaccount: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """

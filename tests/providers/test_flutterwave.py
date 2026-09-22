@@ -174,3 +174,30 @@ def test_initiate_transfer_raises_on_failure(provider, monkeypatch):
         provider.initiate_transfer(
             recipient={"account_bank": "058", "account_number": "bad"}, amount=5000
         )
+
+
+def test_create_subaccount_success(provider, monkeypatch):
+    captured = {}
+
+    def fake_post(url, data, headers):
+        captured.update(data)
+        return {"status": "success", "data": {"id": 999}}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    result = provider.create_subaccount(
+        business_name="Shop", account_number="0123456789", bank_code="058"
+    )
+    assert result["id"] == 999
+    assert captured["split_type"] == "percentage"
+
+
+def test_create_subaccount_raises_on_failure(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "post",
+        lambda url, data, headers: {"status": "error", "message": "Invalid bank"},
+    )
+    with pytest.raises(ProviderError, match="Invalid bank"):
+        provider.create_subaccount(
+            business_name="Shop", account_number="0123456789", bank_code="000"
+        )

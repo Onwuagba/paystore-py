@@ -70,6 +70,12 @@ class StripeProvider(BaseProvider):
     fundamentally different integration than "send money to a bank
     account by number," not a drop-in equivalent of the other
     providers' transfer APIs.
+
+    create_subaccount isn't implemented for the same reason — Stripe
+    "split payments" means a destination charge to an already-onboarded
+    Connect account, which initialize_payment already supports without
+    any new method: pass `transfer_data={"destination": account_id}`
+    and `application_fee_amount=...` as kwargs.
     """
 
     BASE_URL = "https://api.stripe.com/v1"
