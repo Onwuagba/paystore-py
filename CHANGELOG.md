@@ -47,6 +47,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   for non-Django usage (paystore-django already had one for Django).
 - `scripts/smoke_test.py`: an opt-in script that hits real provider
   sandboxes to catch anything mocked tests can't (see CONTRIBUTING.md).
+- Refunds: `gateway.payments.refund(reference, amount=None)` (full or
+  partial), implemented for Paystack, Flutterwave, and Stripe.
+- Recurring billing: `gateway.subscriptions.create_plan`/`subscribe`/
+  `cancel`, wrapping each provider's native Plan/Subscription objects
+  (Paystack and Stripe only — see Provider Support in the README for
+  why Flutterwave/Remita aren't included).
+- `HTTPClient.delete()` (needed for Stripe subscription cancellation).
+- `paystore.utils.currency.is_zero_decimal_currency` — Stripe requires
+  *not* multiplying JPY/KRW-style currencies by 100.
+- `paystore.webhooks.headers.SIGNATURE_HEADERS`: the provider-name to
+  signature-header mapping, shared by paystore-django and
+  `examples/webhook_server_example.py` instead of being duplicated.
 
 ### Fixed
 - `HTTPClient` exceptions now suppress the original httpx exception as

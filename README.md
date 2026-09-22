@@ -91,6 +91,8 @@ gateway = Gateway(
 | Webhook signature verification | ✅ | ✅ | ✅ | ✅ |
 | Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ |
 | List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ |
+| Refunds (`gateway.payments.refund`) | ✅ | ✅ | ✅ | ❌ |
+| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ |
 
 Check a provider's support in code instead of catching
 `NotImplementedError`:
@@ -105,16 +107,41 @@ Notes:
   Paystack's or Stripe's, so `gateway.customers` and `gateway.tokens`
   raise `NotImplementedError` for that provider; recurring charges still
   work via `charge_authorization` using the card token from a verified
-  transaction.
+  transaction. Flutterwave's own recurring-billing model attaches a
+  `payment_plan` to `initialize_payment` directly rather than a separate
+  subscribe/cancel API per customer, so `gateway.subscriptions` isn't
+  implemented for it either — pass `payment_plan=...` to `initialize`.
 - Stripe does not support NGN — pass a currency it supports (e.g.
-  `currency="USD"`).
+  `currency="USD"`). Zero-decimal currencies (JPY, KRW, etc.) don't get
+  multiplied by 100 — see `paystore.utils.currency.is_zero_decimal_currency`.
 - Remita uses an RRR (Remita Retrieval Reference) flow instead of
-  charge-by-token, so `charge_authorization` and customer management
-  aren't implemented for it; it also requires `api_secret`,
-  `merchant_id`, and `service_type_id` in addition to `api_key`. It was
-  implemented from Remita's published docs but not verified against a
-  live sandbox — double-check field names/status codes for your account
-  before relying on it in production.
+  charge-by-token, so `charge_authorization`, customer management,
+  refunds, and subscriptions aren't implemented for it; it also
+  requires `api_secret`, `merchant_id`, and `service_type_id` in
+  addition to `api_key`. It was implemented from Remita's published
+  docs but not verified against a live sandbox — double-check field
+  names/status codes for your account before relying on it in production.
+- Refunds accept an optional `amount` for a partial refund; omit it to
+  refund in full: `gateway.payments.refund(reference, amount=500)`.
+- Plan `interval` values are provider-specific and passed straight
+  through — Paystack wants `"monthly"`, Stripe wants `"month"`, etc.
+
+## Refunds and recurring billing
+
+```python
+# Refund (full or partial)
+gateway.payments.refund(transaction["reference"])
+gateway.payments.refund(transaction["reference"], amount=500)  # partial
+
+# Recurring billing (Paystack/Stripe — see Provider Support above)
+plan = gateway.subscriptions.create_plan(
+    name="Monthly", amount=5000, interval="monthly"  # Stripe: interval="month"
+)
+subscription = gateway.subscriptions.subscribe(
+    customer=customer["customer_code"], plan=plan["plan_code"]
+)
+gateway.subscriptions.cancel(subscription["subscription_code"])
+```
 
 ## Async usage
 
@@ -136,10 +163,11 @@ async def pay():
 ```
 
 It mirrors `Gateway`'s methods directly (`initialize_payment`,
-`verify_payment`, `charge_authorization`, `create_customer`,
-`get_customer`, `update_customer`, `list_tokens`, `deactivate_token`,
-`verify_webhook`) rather than the `.payments`/`.customers`/`.tokens`
-facade.
+`verify_payment`, `charge_authorization`, `refund_payment`,
+`create_customer`, `get_customer`, `update_customer`, `list_tokens`,
+`deactivate_token`, `create_plan`, `subscribe`, `cancel_subscription`,
+`verify_webhook`, plus a synchronous `supports()`) rather than the
+`.payments`/`.customers`/`.tokens`/`.subscriptions` facade.
 
 ## Logging
 

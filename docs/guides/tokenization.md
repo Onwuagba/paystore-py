@@ -61,17 +61,25 @@ gateway.tokens.deactivate("AUTH_abc123")
 
 ## Subscription Example
 
+For a manual cron-driven subscription loop (works with every provider
+that supports charge_authorization):
+
 ```python
 # Monthly subscription
 result = gateway.payments.charge_authorization(
     authorization_code="AUTH_abc123",
     email="customer@example.com",
-    amount=9900  # ₦99/month
+    amount=9900,  # ₦99/month
+    idempotency_key=f"sub-{subscription_id}-{billing_period}",  # avoid double-charging on retry
 )
 
 if result['status'] == 'success':
     print("Subscription charged successfully!")
 ```
+
+Paystack and Stripe also expose their native recurring-billing objects
+(handles retries/dunning for you) via `gateway.subscriptions` — see the
+"Refunds and recurring billing" section of the main README.
 
 ## Security Best Practices
 
