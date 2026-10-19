@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-19
+
+### Added
+- `Invoice.subtotal`, `.tax`, `.total`, `.period_start` and `.period_end`
+  (Stripe's billed period comes from the first line item, not the
+  invoice's own generation timestamps).
+
 ## [0.5.0] - 2026-10-19
 
 ### Added

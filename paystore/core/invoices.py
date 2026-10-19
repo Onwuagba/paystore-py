@@ -17,8 +17,23 @@ _STRIPE_STATUS = {
 }
 
 
+def _stripe_tax(raw: Dict[str, Any]) -> Optional[int]:
+    if raw.get("tax") is not None:  # older API versions
+        return int(raw["tax"])
+    taxes = raw.get("total_taxes")  # newer API versions
+    if taxes is not None:
+        return sum(int(t.get("amount", 0)) for t in taxes)
+    return None
+
+
 def _stripe(raw: Dict[str, Any]) -> Invoice:
     currency = raw.get("currency")
+    # The invoice's own period_start/end is when it was generated; the
+    # period actually billed is on its first line item.
+    lines = (raw.get("lines") or {}).get("data") or []
+    period = (lines[0].get("period") if lines else None) or {}
+    period_start = period.get("start") or raw.get("period_start")
+    period_end = period.get("end") or raw.get("period_end")
     # Newer API versions nest the subscription under parent.subscription_details.
     parent = (raw.get("parent") or {}).get("subscription_details") or {}
     subscription = raw.get("subscription") or parent.get("subscription")
@@ -30,7 +45,12 @@ def _stripe(raw: Dict[str, Any]) -> Invoice:
         status=_STRIPE_STATUS.get(str(raw.get("status")), _I.UNKNOWN),
         amount_due=raw.get("amount_due"),
         amount_paid=raw.get("amount_paid"),
+        subtotal=raw.get("subtotal"),
+        tax=_stripe_tax(raw),
+        total=raw.get("total"),
         currency=currency.upper() if currency else None,
+        period_start=parse_datetime(period_start),
+        period_end=parse_datetime(period_end),
         hosted_url=raw.get("hosted_invoice_url"),
         pdf_url=raw.get("invoice_pdf"),
         subscription_id=(
@@ -62,6 +82,7 @@ def _paypal(raw: Dict[str, Any]) -> Invoice:
             status=_I.FAILED,
             amount_due=due,
             amount_paid=0,
+            total=due,
             currency=currency,
             subscription_id=raw.get("id"),
             customer_id=(raw.get("subscriber") or {}).get("payer_id"),
@@ -74,12 +95,21 @@ def _paypal(raw: Dict[str, Any]) -> Invoice:
     total = amount.get("total")
     paid = from_decimal_string(total, currency) if total and currency else None
     completed = str(raw.get("state")).lower() == "completed"
+    details = amount.get("details") or {}
+
+    def minor(key: str) -> Optional[int]:
+        value = details.get(key)
+        return from_decimal_string(value, currency) if value and currency else None
+
     return Invoice(
         id=str(raw.get("id", "")),
         provider="paypal",
         status=_I.PAID if completed else _I.UNKNOWN,
         amount_due=paid,
         amount_paid=paid if completed else 0,
+        subtotal=minor("subtotal"),
+        tax=minor("tax"),
+        total=paid,
         currency=currency,
         subscription_id=raw.get("billing_agreement_id"),
         created_at=parse_datetime(raw.get("create_time")),
@@ -101,6 +131,7 @@ def _paystack(raw: Dict[str, Any]) -> Invoice:
         status=status,
         amount_due=amount,
         amount_paid=amount if paid else 0,
+        total=amount,
         currency=raw.get("currency"),
         subscription_id=subscription.get("subscription_code"),
         customer_id=customer.get("customer_code"),

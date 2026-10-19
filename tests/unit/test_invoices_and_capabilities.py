@@ -179,3 +179,48 @@ def test_capabilities_per_provider():
         ]
         is False
     )
+
+
+def test_stripe_invoice_totals_tax_and_billed_period():
+    raw = {
+        "id": "in_3",
+        "subtotal": 5000,
+        "total": 5375,
+        "tax": 375,
+        "period_start": 1,
+        "period_end": 2,
+        "lines": {"data": [{"period": {"start": 1690000000, "end": 1692592000}}]},
+    }
+    inv = parse_invoice("stripe", raw)
+    assert (inv.subtotal, inv.tax, inv.total) == (5000, 375, 5375)
+    assert inv.period_start.year == 2023  # line period, not the invoice's own
+
+
+def test_stripe_invoice_tax_from_total_taxes_and_period_fallback():
+    raw = {
+        "id": "in_4",
+        "total": 1100,
+        "total_taxes": [{"amount": 60}, {"amount": 40}],
+        "period_start": 1690000000,
+        "period_end": 1692592000,
+    }
+    inv = parse_invoice("stripe", raw)
+    assert inv.tax == 100 and inv.period_end.year == 2023
+    assert parse_invoice("stripe", {"id": "in_5"}).tax is None
+
+
+def test_paypal_sale_tax_details_and_paystack_total():
+    sale = parse_invoice(
+        "paypal",
+        {
+            "id": "S",
+            "state": "completed",
+            "amount": {
+                "total": "10.75",
+                "currency": "USD",
+                "details": {"subtotal": "10.00", "tax": "0.75"},
+            },
+        },
+    )
+    assert (sale.subtotal, sale.tax, sale.total) == (1000, 75, 1075)
+    assert parse_invoice("paystack", {"invoice_code": "I", "amount": 500}).total == 500

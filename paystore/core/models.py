@@ -120,7 +120,8 @@ class Invoice(BaseModel):
     """
     A subscription invoice / billing attempt, normalized across providers.
 
-    Amounts are minor units. `hosted_url`/`pdf_url` are Stripe-only.
+    Amounts are minor units; fields a provider doesn't report are None.
+    `hosted_url`/`pdf_url` are Stripe-only.
     `attempt_count` and `next_attempt_at` drive dunning: Stripe reports
     both; PayPal/Paystack leave them None.
     """
@@ -131,7 +132,12 @@ class Invoice(BaseModel):
     status: InvoiceStatus = InvoiceStatus.UNKNOWN
     amount_due: Optional[int] = None
     amount_paid: Optional[int] = None
+    subtotal: Optional[int] = None  # before tax
+    tax: Optional[int] = None
+    total: Optional[int] = None  # subtotal + tax
     currency: Optional[str] = None
+    period_start: Optional[datetime] = None  # the billing period this invoice covers
+    period_end: Optional[datetime] = None
     hosted_url: Optional[str] = None
     pdf_url: Optional[str] = None
     subscription_id: Optional[str] = None
