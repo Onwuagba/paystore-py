@@ -34,6 +34,12 @@ class PaystackProvider(BaseProvider):
         }
     )
 
+    SUBSCRIPTION_CAPABILITIES = {
+        "cancel_at_period_end": True,  # always: disable == non-renewing
+        "trials": False,
+        "verified_live": True,
+    }
+
     def __init__(self, config):
         super().__init__(config)
         self.client = HTTPClient(config)

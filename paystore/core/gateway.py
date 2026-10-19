@@ -1,12 +1,12 @@
 """Main Gateway class."""
 
 import os
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from paystore.core.base_provider import BaseProvider
 from paystore.core.config import Config
 from paystore.core.exceptions import ConfigurationError
-from paystore.core.models import Payment, Subscription
+from paystore.core.models import Invoice, Payment, Subscription
 from paystore.security.validation import validate_amount, validate_email
 from paystore.storage.base import BaseStorage, NoOpStorage
 
@@ -201,6 +201,11 @@ class Gateway:
         return SubscriptionOperations(self._provider)
 
     @property
+    def invoices(self) -> "InvoiceOperations":
+        """Access invoice history (gateway.supports("invoices"))."""
+        return InvoiceOperations(self._provider)
+
+    @property
     def transfers(self) -> "TransferOperations":
         """Access transfer/payout operations."""
         return TransferOperations(self._provider)
@@ -248,7 +253,7 @@ class Gateway:
         Args:
             feature: one of "charge_authorization", "customers", "tokens",
                 "refunds", "subscriptions", "subscription_management",
-                "subscription_checkout", "billing_portal", "transfers",
+                "subscription_checkout", "billing_portal", "invoices", "transfers",
                 "split_payments". initialize/verify/webhook
                 verification are supported by every provider and aren't
                 part of this check.
@@ -314,6 +319,33 @@ class SubscriptionOperations:
     def __init__(self, provider: BaseProvider):
         self._provider = provider
 
+    def capabilities(self) -> Dict[str, bool]:
+        """
+        What the active provider's subscriptions can do, so UI and
+        business logic can branch instead of catching errors. Keys:
+        cancel_at_period_end, resume, update_quantity,
+        quantity_change_needs_approval (change returns an
+        `approval_url`), hosted_checkout, billing_portal, trials,
+        automatic_tax, fixed_tax_rate, reuse_product, invoices,
+        verified_live.
+        """
+        keys = (
+            "cancel_at_period_end",
+            "resume",
+            "update_quantity",
+            "quantity_change_needs_approval",
+            "hosted_checkout",
+            "billing_portal",
+            "trials",
+            "automatic_tax",
+            "fixed_tax_rate",
+            "reuse_product",
+            "invoices",
+            "verified_live",
+        )
+        declared = self._provider.SUBSCRIPTION_CAPABILITIES
+        return {key: declared.get(key, False) for key in keys}
+
     def create_plan(
         self,
         name: str,
@@ -324,6 +356,10 @@ class SubscriptionOperations:
     ) -> Dict[str, Any]:
         """
         Create a recurring billing plan.
+
+        To add more prices (currencies/intervals) to one product, pass
+        the existing product via `product=` (Stripe) / `product_id=`
+        (PayPal); `product_id` comes back in every result.
 
         `interval`'s valid values are provider-specific (e.g. Paystack
         wants "monthly", Stripe wants "month") and are passed straight
@@ -389,6 +425,28 @@ class SubscriptionOperations:
         return self._provider.create_billing_portal_session(
             customer=customer, return_url=return_url, **kwargs
         )
+
+
+class InvoiceOperations:
+    """Subscription invoice history (Stripe)."""
+
+    def __init__(self, provider: BaseProvider):
+        self._provider = provider
+
+    def list(
+        self,
+        customer: Optional[str] = None,
+        subscription: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Invoice]:
+        """List invoices, newest first."""
+        return self._provider.list_invoices(
+            customer=customer, subscription=subscription, limit=limit
+        )
+
+    def get(self, invoice_id: str) -> Invoice:
+        """Fetch one invoice (number, amounts, hosted/PDF URLs)."""
+        return self._provider.get_invoice(invoice_id)
 
 
 class TransferOperations:

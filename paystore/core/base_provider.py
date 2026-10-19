@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, FrozenSet, List, Optional
 
 from paystore.core.config import Config
-from paystore.core.models import Subscription
+from paystore.core.models import Invoice, Subscription
 
 
 class BaseProvider(ABC):
@@ -30,6 +30,17 @@ class BaseProvider(ABC):
     a clear message (see the defaults below) — SUPPORTED_FEATURES is
     for callers who want to check ahead of time via Gateway.supports()
     instead of catching the exception.
+    """
+
+    SUBSCRIPTION_CAPABILITIES: Dict[str, bool] = {}
+    """
+    Fine-grained subscription behavior, beyond the coarse
+    SUPPORTED_FEATURES names, exposed via
+    Gateway.subscriptions.capabilities(). Keys: cancel_at_period_end,
+    resume, update_quantity, quantity_change_needs_approval,
+    hosted_checkout, billing_portal, trials, automatic_tax,
+    fixed_tax_rate, reuse_product, invoices, verified_live. Missing
+    keys read as False.
     """
 
     def __init__(self, config: Config):
@@ -202,6 +213,23 @@ class BaseProvider(ABC):
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support a billing portal"
+        )
+
+    def list_invoices(
+        self,
+        customer: Optional[str] = None,
+        subscription: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Invoice]:
+        """List invoices, newest first (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support listing invoices"
+        )
+
+    def get_invoice(self, invoice_id: str) -> Invoice:
+        """Fetch one invoice (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support reading invoices"
         )
 
     def create_transfer_recipient(

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from paystore.core.config import Config
 from paystore.core.gateway import Gateway
-from paystore.core.models import Payment, Subscription
+from paystore.core.models import Invoice, Payment, Subscription
 
 if TYPE_CHECKING:
     from paystore.webhooks.events import WebhookEvent
@@ -185,6 +185,26 @@ class AsyncGateway:
         return await _run_sync(
             self._gateway.subscriptions.portal, customer, return_url, **kwargs
         )
+
+    async def list_invoices(
+        self,
+        customer: Optional[str] = None,
+        subscription: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Invoice]:
+        return await _run_sync(
+            self._gateway.invoices.list,
+            customer=customer,
+            subscription=subscription,
+            limit=limit,
+        )
+
+    async def get_invoice(self, invoice_id: str) -> Invoice:
+        return await _run_sync(self._gateway.invoices.get, invoice_id)
+
+    def subscription_capabilities(self) -> Dict[str, bool]:
+        """Synchronous — static per provider."""
+        return self._gateway.subscriptions.capabilities()
 
     async def verify_webhook(self, payload: bytes, signature: str) -> bool:
         return await _run_sync(self._gateway.verify_webhook, payload, signature)

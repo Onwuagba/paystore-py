@@ -52,6 +52,9 @@ class Subscription(BaseModel):
     trial_end: Optional[datetime] = None
     cancel_at_period_end: bool = False
     canceled_at: Optional[datetime] = None
+    # Set when a change (e.g. a PayPal seat revision) only takes effect
+    # once the customer follows this link.
+    approval_url: Optional[str] = None
     raw: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -66,15 +69,28 @@ class PaymentStatus(str, Enum):
 
 
 class Payment(BaseModel):
-    """A verified payment, normalized across providers (`raw` = provider response)."""
+    """
+    A verified payment or checkout session, normalized across providers.
+
+    amount is in minor units and currency upper-case where the provider
+    reports them (Stripe, Paystack, PayPal); None otherwise.
+    `subscription_id` is set for a completed subscription-mode checkout.
+    `raw` is the provider's full response.
+    """
 
     reference: str
     provider: str
     status: PaymentStatus = PaymentStatus.UNKNOWN
+    amount: Optional[int] = None
+    currency: Optional[str] = None
+    customer_id: Optional[str] = None
+    subscription_id: Optional[str] = None
     raw: Dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def from_raw(cls, provider: str, raw: Dict[str, Any]) -> "Payment":
+        from paystore.core.payments import extract_payment_fields
+
         try:
             status = PaymentStatus(str(raw.get("status")).lower())
         except ValueError:
@@ -84,4 +100,43 @@ class Payment(BaseModel):
             provider=provider,
             status=status,
             raw=raw,
+            **extract_payment_fields(provider, raw),
         )
+
+
+class InvoiceStatus(str, Enum):
+    """Provider-neutral invoice states."""
+
+    DRAFT = "draft"
+    OPEN = "open"
+    PAID = "paid"
+    FAILED = "failed"
+    UNCOLLECTIBLE = "uncollectible"
+    VOID = "void"
+    UNKNOWN = "unknown"
+
+
+class Invoice(BaseModel):
+    """
+    A subscription invoice / billing attempt, normalized across providers.
+
+    Amounts are minor units. `hosted_url`/`pdf_url` are Stripe-only.
+    `attempt_count` and `next_attempt_at` drive dunning: Stripe reports
+    both; PayPal/Paystack leave them None.
+    """
+
+    id: str
+    provider: str
+    number: Optional[str] = None
+    status: InvoiceStatus = InvoiceStatus.UNKNOWN
+    amount_due: Optional[int] = None
+    amount_paid: Optional[int] = None
+    currency: Optional[str] = None
+    hosted_url: Optional[str] = None
+    pdf_url: Optional[str] = None
+    subscription_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    attempt_count: Optional[int] = None
+    next_attempt_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    raw: Dict[str, Any] = Field(default_factory=dict)

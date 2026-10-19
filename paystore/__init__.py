@@ -24,6 +24,8 @@ __all__ = [
     "__version__",
     "Gateway",
     "AsyncGateway",
+    "Invoice",
+    "InvoiceStatus",
     "Payment",
     "PaymentStatus",
     "Subscription",

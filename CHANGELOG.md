@@ -5,6 +5,31 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
+### Added
+- `Invoice` / `InvoiceStatus` models, `gateway.invoices.list/get` (Stripe),
+  and `WebhookEvent.invoice` on invoice.* events (number, amounts,
+  hosted/PDF URLs, attempt_count/next_attempt_at for dunning). PayPal and
+  Paystack billing events parse into `Invoice` too.
+- More neutral event types: `subscription.trial_will_end`, `.paused`,
+  `.resumed`, `invoice.created/finalized/upcoming/payment_action_required/
+  voided/uncollectible`, `checkout.expired`, `dispute.created`.
+- `gateway.subscriptions.capabilities()` — per-provider flags
+  (cancel_at_period_end, billing_portal, quantity_change_needs_approval,
+  verified_live, ...) so callers can branch without catching errors.
+- `Payment` now carries `amount`, `currency`, `customer_id` and
+  `subscription_id`, so `gateway.payments.retrieve()` confirms a Stripe
+  Checkout Session (including subscription checkouts) without raw dicts.
+- `create_plan(product=...)` (Stripe) / `create_plan(product_id=...)`
+  (PayPal) to add prices to an existing product; `product_id` is returned.
+- `Subscription.approval_url`, set when a PayPal seat change needs the
+  customer's approval.
+
+### Changed
+- httpx constraint widened from `^0.25.0` to `>=0.25.0,<1.0` (tested on
+  0.25.2 and 0.28.1).
+
 ## [0.4.0] - 2026-10-19
 
 ### Added

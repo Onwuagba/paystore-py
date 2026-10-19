@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from paystore.core.models import Subscription
+from paystore.core.invoices import parse_invoice
+from paystore.core.models import Invoice, Subscription
 from paystore.core.subscriptions import parse_datetime, parse_subscription
 
 # Provider -> the raw payload key holding the event type/name.
@@ -25,27 +26,42 @@ UNKNOWN = "unknown"
 _CANONICAL_TYPES = {
     "stripe": {
         "checkout.session.completed": "checkout.completed",
+        "checkout.session.expired": "checkout.expired",
         "checkout.session.async_payment_succeeded": "payment.succeeded",
         "checkout.session.async_payment_failed": "payment.failed",
         "payment_intent.succeeded": "payment.succeeded",
         "payment_intent.payment_failed": "payment.failed",
         "charge.refunded": "refund.processed",
+        "charge.dispute.created": "dispute.created",
         "customer.subscription.created": "subscription.created",
         "customer.subscription.updated": "subscription.updated",
         "customer.subscription.deleted": "subscription.canceled",
+        "customer.subscription.paused": "subscription.paused",
+        "customer.subscription.resumed": "subscription.resumed",
+        "customer.subscription.trial_will_end": "subscription.trial_will_end",
+        "invoice.created": "invoice.created",
+        "invoice.finalized": "invoice.finalized",
+        "invoice.upcoming": "invoice.upcoming",
         "invoice.paid": "invoice.paid",
+        "invoice.payment_succeeded": "invoice.paid",
         "invoice.payment_failed": "invoice.payment_failed",
+        "invoice.payment_action_required": "invoice.payment_action_required",
+        "invoice.voided": "invoice.voided",
+        "invoice.marked_uncollectible": "invoice.uncollectible",
     },
     "paystack": {
         "charge.success": "payment.succeeded",
         "refund.processed": "refund.processed",
+        "charge.dispute.create": "dispute.created",
         "subscription.create": "subscription.created",
         "subscription.disable": "subscription.canceled",
         "subscription.not_renew": "subscription.updated",
+        "invoice.create": "invoice.created",
+        "invoice.update": "invoice.updated",
         "invoice.payment_failed": "invoice.payment_failed",
     },
     "flutterwave": {
-        # charge.completed also fires for failed charges — see _flutterwave_type.
+        # charge.completed also fires for failed charges — see _canonical_type.
         "charge.completed": "payment.succeeded",
     },
     "paypal": {
@@ -53,11 +69,13 @@ _CANONICAL_TYPES = {
         "PAYMENT.CAPTURE.DENIED": "payment.failed",
         "PAYMENT.CAPTURE.DECLINED": "payment.failed",
         "PAYMENT.CAPTURE.REFUNDED": "refund.processed",
+        "PAYMENT.SALE.REFUNDED": "refund.processed",
+        "CUSTOMER.DISPUTE.CREATED": "dispute.created",
         "BILLING.SUBSCRIPTION.CREATED": "subscription.created",
         "BILLING.SUBSCRIPTION.ACTIVATED": "subscription.updated",
-        "BILLING.SUBSCRIPTION.RE-ACTIVATED": "subscription.updated",
+        "BILLING.SUBSCRIPTION.RE-ACTIVATED": "subscription.resumed",
         "BILLING.SUBSCRIPTION.UPDATED": "subscription.updated",
-        "BILLING.SUBSCRIPTION.SUSPENDED": "subscription.updated",
+        "BILLING.SUBSCRIPTION.SUSPENDED": "subscription.paused",
         "BILLING.SUBSCRIPTION.CANCELLED": "subscription.canceled",
         "BILLING.SUBSCRIPTION.EXPIRED": "subscription.canceled",
         "BILLING.SUBSCRIPTION.PAYMENT.FAILED": "invoice.payment_failed",
@@ -103,6 +121,16 @@ def _subscription(
         return None
 
 
+def _invoice(provider: str, canonical: str, data: Dict[str, Any]) -> Optional[Invoice]:
+    """Parse the invoice object, for events whose data is one."""
+    if not canonical.startswith("invoice."):
+        return None
+    try:
+        return parse_invoice(provider, data)
+    except ValueError:
+        return None
+
+
 @dataclass(frozen=True)
 class WebhookEvent:
     """
@@ -111,12 +139,19 @@ class WebhookEvent:
     - `event_type` is the provider's own event name, unchanged.
     - `type` is paystore's neutral name — "payment.succeeded",
       "payment.failed", "refund.processed", "checkout.completed",
-      "subscription.created" / ".updated" / ".canceled",
-      "invoice.paid", "invoice.payment_failed" — or "unknown" for
+      "checkout.expired", "dispute.created",
+      "subscription.created" / ".updated" / ".canceled" / ".paused" /
+      ".resumed" / ".trial_will_end", "invoice.created" / ".finalized" /
+      ".upcoming" / ".paid" / ".payment_failed" /
+      ".payment_action_required" / ".voided" / ".uncollectible" — or "unknown" for
       events not mapped (use `event_type`/`raw` for those).
     - `id` and `created_at` come from the provider where it supplies
       them (Stripe, PayPal); None otherwise. Use `id` to dedupe
       redelivered webhooks.
+    - `invoice` is a normalized Invoice for invoice.* events — number,
+      amounts, hosted/PDF URLs, attempt_count/next_attempt_at for
+      dunning (PayPal's failed-payment event carries the failed
+      attempt as an Invoice with status "failed").
     - `subscription` is a normalized Subscription for subscription.*
       events (reflecting the state at the time of the event).
     - `data` is the provider's event object; `raw` the full unmodified
@@ -132,6 +167,7 @@ class WebhookEvent:
     id: Optional[str] = None
     created_at: Optional[datetime] = None
     subscription: Optional[Subscription] = None
+    invoice: Optional[Invoice] = None
 
     @classmethod
     def from_raw(cls, provider: str, raw: Dict[str, Any]) -> "WebhookEvent":
@@ -158,4 +194,5 @@ class WebhookEvent:
             id=_event_id(provider, raw),
             created_at=_created_at(provider, raw),
             subscription=_subscription(provider, canonical, data),
+            invoice=_invoice(provider, canonical, data),
         )

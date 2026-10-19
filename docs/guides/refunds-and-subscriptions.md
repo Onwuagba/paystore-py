@@ -92,6 +92,25 @@ redirect(portal["url"])                      # Stripe only
 | Trials | `trial_days` | `create_plan(trial_days=)` | via plan |
 | Tax | `automatic_tax=True` | `create_plan(tax_percentage=)` | ❌ |
 
+Check `gateway.subscriptions.capabilities()` instead of hardcoding the
+table above — it returns flags such as `cancel_at_period_end`,
+`billing_portal`, `quantity_change_needs_approval` (the change returns a
+`Subscription.approval_url` to send the buyer to), `fixed_tax_rate` vs
+`automatic_tax`, `reuse_product` and `verified_live`.
+
+One product, many prices: `create_plan(..., product=product_id)` (Stripe)
+or `product_id=` (PayPal) adds a price to an existing product; reuse the
+`product_id` from the first call.
+
+Invoice history (Stripe): `gateway.invoices.list(customer=..., limit=...)`
+returns `Invoice` objects with `number`, `amount_due`, `currency`,
+`hosted_url`, `pdf_url`, `attempt_count` and `next_attempt_at`. The same
+`Invoice` arrives on `event.invoice` for `invoice.*` webhooks.
+
+Confirming a checkout on return: `gateway.payments.retrieve(session_id)`
+returns a `Payment` with `status`, `amount`, `currency`, `customer_id` and
+`subscription_id`.
+
 PayPal Subscriptions were written from PayPal's docs and are **not
 verified against a live account**. PayPal subscriptions are approved by
 the customer at PayPal, so `subscribe` returns an `authorization_url`

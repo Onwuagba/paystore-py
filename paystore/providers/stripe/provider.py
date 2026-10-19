@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 from paystore.core.base_provider import BaseProvider
 from paystore.core.exceptions import ConfigurationError, PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
-from paystore.core.models import Subscription
+from paystore.core.invoices import parse_invoice
+from paystore.core.models import Invoice, Subscription
 from paystore.core.subscriptions import parse_subscription
 
 _STATUS_MAP = {
@@ -92,8 +93,23 @@ class StripeProvider(BaseProvider):
             "subscription_management",
             "subscription_checkout",
             "billing_portal",
+            "invoices",
         }
     )
+    SUBSCRIPTION_CAPABILITIES = {
+        "cancel_at_period_end": True,
+        "resume": True,
+        "update_quantity": True,
+        "quantity_change_needs_approval": False,
+        "hosted_checkout": True,
+        "billing_portal": True,
+        "trials": True,
+        "automatic_tax": True,
+        "fixed_tax_rate": False,
+        "reuse_product": True,
+        "invoices": True,
+        "verified_live": True,
+    }
 
     def __init__(self, config):
         super().__init__(config)
@@ -355,20 +371,27 @@ class StripeProvider(BaseProvider):
         interval: one of Stripe's interval values — "day", "week",
         "month", "year" (unlike Paystack's "daily"/"weekly"/etc — these
         are passed straight through, not translated between providers).
+
+        Pass `product="prod_..."` to add another Price (a different
+        currency or interval) to an existing Product instead of
+        creating a new Product; the Product used is returned as
+        `product_id`, so reuse it for the plan's other prices.
         """
+        product_id = kwargs.pop("product", None)
         try:
-            product = self._post("products", {"name": name})
+            if not product_id:
+                product_id = self._post("products", {"name": name}).get("id")
             price = self._post(
                 "prices",
                 {
                     "unit_amount": amount,
                     "currency": currency.lower(),
                     "recurring": {"interval": interval},
-                    "product": product.get("id"),
+                    "product": product_id,
                     **kwargs,
                 },
             )
-            return {**price, "plan_code": price.get("id")}
+            return {**price, "plan_code": price.get("id"), "product_id": product_id}
         except PaymentError:
             raise
         except Exception as e:
@@ -532,6 +555,39 @@ class StripeProvider(BaseProvider):
             raise
         except Exception as e:
             raise ProviderError(f"Failed to create subscription checkout: {e}") from e
+
+    def list_invoices(
+        self,
+        customer: Optional[str] = None,
+        subscription: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Invoice]:
+        """List invoices (newest first), filtered by customer and/or subscription."""
+        query = "&".join(
+            f"{key}={value}"
+            for key, value in (
+                ("customer", customer),
+                ("subscription", subscription),
+                ("limit", limit),
+            )
+            if value is not None
+        )
+        try:
+            data = self._get(f"invoices?{query}")
+            return [parse_invoice("stripe", item) for item in data.get("data", [])]
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to list invoices: {e}") from e
+
+    def get_invoice(self, invoice_id: str) -> Invoice:
+        """Fetch one invoice, including its hosted and PDF URLs."""
+        try:
+            return parse_invoice("stripe", self._get(f"invoices/{invoice_id}"))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to get invoice: {e}") from e
 
     def create_billing_portal_session(
         self, customer: str, return_url: str, **kwargs: Any

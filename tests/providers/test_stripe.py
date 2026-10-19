@@ -384,3 +384,30 @@ def test_billing_portal_session(provider, monkeypatch):
 
 def test_no_payment_required_session_counts_as_success(provider):
     assert provider._normalize_status("no_payment_required") == "success"
+
+
+def test_create_plan_reuses_existing_product(provider, monkeypatch):
+    calls = _capture_post_form(provider, monkeypatch, {"id": "price_2"})
+    result = provider.create_plan("Pro", 900, "year", currency="EUR", product="prod_1")
+    assert len(calls) == 1 and calls[0][0].endswith("/prices")
+    assert calls[0][1]["product"] == "prod_1"
+    assert result["product_id"] == "prod_1" and result["plan_code"] == "price_2"
+
+
+def test_list_invoices_builds_query_and_parses(provider, monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers):
+        captured["url"] = url
+        return {
+            "data": [
+                {"id": "in_1", "status": "paid", "amount_paid": 100, "currency": "usd"}
+            ]
+        }
+
+    monkeypatch.setattr(provider.client, "get", fake_get)
+    invoices = provider.list_invoices(customer="cus_1", subscription="sub_1", limit=5)
+    assert captured["url"].endswith(
+        "invoices?customer=cus_1&subscription=sub_1&limit=5"
+    )
+    assert invoices[0].status.value == "paid"

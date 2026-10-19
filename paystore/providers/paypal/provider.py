@@ -62,6 +62,20 @@ class PaypalProvider(BaseProvider):
             "subscription_checkout",
         }
     )
+    SUBSCRIPTION_CAPABILITIES = {
+        "cancel_at_period_end": False,
+        "resume": True,
+        "update_quantity": True,
+        "quantity_change_needs_approval": True,
+        "hosted_checkout": True,
+        "billing_portal": False,
+        "trials": True,
+        "automatic_tax": False,
+        "fixed_tax_rate": True,
+        "reuse_product": True,
+        "invoices": False,
+        "verified_live": False,
+    }
     _INTERVALS = {"day": "DAY", "week": "WEEK", "month": "MONTH", "year": "YEAR"}
 
     def __init__(self, config):
@@ -292,6 +306,7 @@ class PaypalProvider(BaseProvider):
         tax_percentage = kwargs.pop("tax_percentage", None)
         tax_inclusive = kwargs.pop("tax_inclusive", False)
         quantity_supported = kwargs.pop("quantity_supported", False)
+        product_id = kwargs.pop("product_id", None)
 
         def cycle(unit: str, count: int, tenure: str, sequence: int, price: str):
             return {
@@ -319,11 +334,12 @@ class PaypalProvider(BaseProvider):
         )
 
         try:
-            product = self._post_json(
-                "/v1/catalogs/products", {"name": name, "type": "SERVICE"}
-            )
+            if not product_id:
+                product_id = self._post_json(
+                    "/v1/catalogs/products", {"name": name, "type": "SERVICE"}
+                ).get("id")
             body: Dict[str, Any] = {
-                "product_id": product.get("id"),
+                "product_id": product_id,
                 "name": name,
                 "billing_cycles": cycles,
                 "payment_preferences": {
@@ -339,7 +355,7 @@ class PaypalProvider(BaseProvider):
                     "inclusive": tax_inclusive,
                 }
             plan = self._post_json("/v1/billing/plans", body)
-            return {**plan, "plan_code": plan.get("id")}
+            return {**plan, "plan_code": plan.get("id"), "product_id": product_id}
         except PaymentError:
             raise
         except Exception as e:
@@ -474,8 +490,8 @@ class PaypalProvider(BaseProvider):
         """
         Revise a subscription's seat `quantity` (plan must have
         quantity_supported=True). PayPal may require the customer to
-        re-approve the change; the revise response's approval link is
-        in the returned Subscription's `raw["revise_links"]`.
+        re-approve the change; if so the returned Subscription's
+        `approval_url` is set — send the customer there.
         """
         body: Dict[str, Any] = dict(kwargs)
         if quantity is not None:
@@ -486,6 +502,14 @@ class PaypalProvider(BaseProvider):
             )
             subscription = self.get_subscription(subscription_code)
             subscription.raw["revise_links"] = revised.get("links", [])
+            subscription.approval_url = next(
+                (
+                    link.get("href")
+                    for link in revised.get("links", [])
+                    if link.get("rel") == "approve"
+                ),
+                None,
+            )
             return subscription
         except PaymentError:
             raise

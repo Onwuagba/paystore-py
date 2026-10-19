@@ -55,3 +55,11 @@ def to_decimal_string(amount: int, currency: str) -> str:
     if is_zero_decimal_currency(currency):
         return str(amount)
     return f"{amount / 100:.2f}"
+
+
+def from_decimal_string(value: str, currency: str) -> int:
+    """Inverse of to_decimal_string: "10.00" -> 1000 (zero-decimal aware)."""
+    from decimal import Decimal
+
+    exponent = 0 if is_zero_decimal_currency(currency) else 2
+    return int((Decimal(str(value)) * (10**exponent)).to_integral_value())

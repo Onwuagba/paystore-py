@@ -344,3 +344,27 @@ def test_billing_portal_not_supported(provider):
 
 def test_supported_features_include_subscriptions(provider):
     assert {"subscriptions", "subscription_checkout"} <= provider.SUPPORTED_FEATURES
+
+
+def test_update_quantity_exposes_approval_url(provider, monkeypatch):
+    _post_recorder(
+        provider,
+        monkeypatch,
+        {"/revise": {"links": [{"rel": "approve", "href": "https://pp/approve"}]}},
+    )
+    monkeypatch.setattr(
+        provider.client, "get", lambda url, headers: {"id": "I-1", "status": "ACTIVE"}
+    )
+    assert (
+        provider.update_subscription("I-1", quantity=2).approval_url
+        == "https://pp/approve"
+    )
+
+
+def test_create_plan_reuses_product_id(provider, monkeypatch):
+    calls = _post_recorder(provider, monkeypatch, {"/v1/billing/plans": {"id": "P-2"}})
+    result = provider.create_plan(
+        "Pro", 1000, "year", currency="EUR", product_id="PROD_1"
+    )
+    assert len(calls) == 1 and calls[0][1]["product_id"] == "PROD_1"
+    assert result["product_id"] == "PROD_1"
