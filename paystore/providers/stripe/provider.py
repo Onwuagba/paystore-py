@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 from paystore.core.base_provider import BaseProvider
 from paystore.core.exceptions import ConfigurationError, PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
+from paystore.core.models import Subscription
+from paystore.core.subscriptions import parse_subscription
 
 _STATUS_MAP = {
     "paid": "success",
@@ -19,6 +21,7 @@ _STATUS_MAP = {
     "requires_payment_method": "pending",
     "requires_confirmation": "pending",
     "processing": "pending",
+    "no_payment_required": "success",  # e.g. a subscription checkout with a free trial
     "canceled": "cancelled",
     "expired": "failed",
 }
@@ -80,7 +83,16 @@ class StripeProvider(BaseProvider):
 
     BASE_URL = "https://api.stripe.com/v1"
     SUPPORTED_FEATURES = frozenset(
-        {"charge_authorization", "customers", "tokens", "refunds", "subscriptions"}
+        {
+            "charge_authorization",
+            "customers",
+            "tokens",
+            "refunds",
+            "subscriptions",
+            "subscription_management",
+            "subscription_checkout",
+            "billing_portal",
+        }
     )
 
     def __init__(self, config):
@@ -366,32 +378,178 @@ class StripeProvider(BaseProvider):
         self, customer: str, plan: str, **kwargs: Any
     ) -> Dict[str, Any]:
         """
-        Subscribe a customer to a Price.
+        Subscribe a customer to a Price directly (no checkout page).
 
-        customer: Stripe customer id. plan: a Price id (from create_plan).
+        customer: Stripe customer id, which must already have a default
+        payment method — for a hosted signup that collects one, use
+        create_subscription_checkout. plan: a Price id (from create_plan).
+
+        Optional kwargs: `quantity` (seats), `trial_days`,
+        `automatic_tax` (bool); anything else goes to Stripe as-is.
         """
+        quantity = kwargs.pop("quantity", None)
+        trial_days = kwargs.pop("trial_days", None)
+        automatic_tax = kwargs.pop("automatic_tax", False)
+        payload = {
+            "customer": customer,
+            "items": [{"price": plan, "quantity": quantity}],
+            "trial_period_days": trial_days,
+            "automatic_tax": {"enabled": True} if automatic_tax else None,
+            **kwargs,
+        }
         try:
-            data = self._post(
-                "subscriptions",
-                {"customer": customer, "items": [{"price": plan}], **kwargs},
-            )
-            return {**data, "subscription_code": data.get("id")}
+            data = self._post("subscriptions", payload)
+            return self._subscription_result(data)
         except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to create subscription: {e}") from e
 
-    def cancel_subscription(
-        self, subscription_code: str, **kwargs: Any
-    ) -> Dict[str, Any]:
-        """Cancel a Stripe subscription immediately."""
+    @staticmethod
+    def _subscription_result(data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            **data,
+            "subscription_code": data.get("id"),
+            "normalized_status": parse_subscription("stripe", data).status.value,
+        }
+
+    def get_subscription(self, subscription_code: str) -> Subscription:
+        """Fetch a subscription by id."""
         try:
-            data = self._delete(f"subscriptions/{subscription_code}")
-            return {"success": True, **data}
+            return parse_subscription(
+                "stripe", self._get(f"subscriptions/{subscription_code}")
+            )
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to get subscription: {e}") from e
+
+    def cancel_subscription(
+        self, subscription_code: str, at_period_end: bool = False, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Cancel a Stripe subscription.
+
+        Immediately by default; with at_period_end=True it stays live
+        (and billed for what's already paid) until the current period
+        ends, and resume_subscription can still undo it before then.
+        """
+        try:
+            if at_period_end:
+                data = self._post(
+                    f"subscriptions/{subscription_code}",
+                    {"cancel_at_period_end": True, **kwargs},
+                )
+            else:
+                data = self._delete(f"subscriptions/{subscription_code}")
+            return {"success": True, **self._subscription_result(data)}
         except PaymentError:
             raise
         except Exception as e:
             raise ProviderError(f"Failed to cancel subscription: {e}") from e
+
+    def resume_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Subscription:
+        """Undo a cancel-at-period-end before the period actually ends."""
+        try:
+            data = self._post(
+                f"subscriptions/{subscription_code}",
+                {"cancel_at_period_end": False, **kwargs},
+            )
+            return parse_subscription("stripe", data)
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to resume subscription: {e}") from e
+
+    def update_subscription(
+        self, subscription_code: str, quantity: Optional[int] = None, **kwargs: Any
+    ) -> Subscription:
+        """
+        Update a subscription — currently seat `quantity` on its first
+        item. Other Stripe fields (e.g. `proration_behavior`) pass through.
+        """
+        try:
+            payload: Dict[str, Any] = dict(kwargs)
+            if quantity is not None:
+                current = self._get(f"subscriptions/{subscription_code}")
+                items = (current.get("items") or {}).get("data") or []
+                if not items:
+                    raise ProviderError(
+                        f"Subscription {subscription_code!r} has no items to update"
+                    )
+                payload["items"] = [{"id": items[0]["id"], "quantity": quantity}]
+            data = self._post(f"subscriptions/{subscription_code}", payload)
+            return parse_subscription("stripe", data)
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to update subscription: {e}") from e
+
+    def create_subscription_checkout(
+        self,
+        plan: str,
+        email: Optional[str] = None,
+        customer: Optional[str] = None,
+        quantity: int = 1,
+        trial_days: Optional[int] = None,
+        automatic_tax: bool = False,
+        success_url: str = "https://example.com/success",
+        cancel_url: str = "https://example.com/cancel",
+        reference: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Create a hosted Checkout Session in subscription mode.
+
+        plan: a Price id. Pass `customer` (existing id) or `email`, not
+        both. Redirect the customer to `authorization_url`; the session's
+        `subscription` id is available after completion (via
+        verify_payment or the checkout.session.completed webhook).
+        """
+        payload = {
+            "mode": "subscription",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "customer": customer,
+            "customer_email": None if customer else email,
+            "client_reference_id": reference,
+            "line_items": [{"price": plan, "quantity": quantity}],
+            "subscription_data": {"trial_period_days": trial_days},
+            "automatic_tax": {"enabled": True} if automatic_tax else None,
+            **kwargs,
+        }
+        try:
+            data = self._post("checkout/sessions", payload)
+            return {
+                **data,
+                "reference": data.get("client_reference_id") or data.get("id"),
+                "authorization_url": data.get("url"),
+                "access_code": data.get("id"),
+            }
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create subscription checkout: {e}") from e
+
+    def create_billing_portal_session(
+        self, customer: str, return_url: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Create a Customer Portal session where the customer can update
+        their card, switch plans and cancel. Redirect them to `url`.
+        The portal must be configured once in the Stripe dashboard.
+        """
+        try:
+            return self._post(
+                "billing_portal/sessions",
+                {"customer": customer, "return_url": return_url, **kwargs},
+            )
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to create billing portal session: {e}") from e
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """

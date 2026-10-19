@@ -437,3 +437,17 @@ def test_subaccounts_facade_delegates_to_provider(gateway_with_fake_provider):
 def test_gateway_supports_refunds_and_subscriptions(provider, feature, expected):
     gateway = Gateway(provider=provider, api_key="test_key")
     assert gateway.supports(feature) is expected
+
+
+def test_payments_retrieve_returns_typed_payment(mock_config, monkeypatch):
+    from paystore.core.gateway import Gateway
+    from paystore.core.models import PaymentStatus
+
+    gateway = Gateway(provider="paystack", api_key="sk_test_mock")
+    monkeypatch.setattr(
+        gateway._provider,
+        "verify_payment",
+        lambda ref: {"reference": ref, "status": "pending"},
+    )
+    payment = gateway.payments.retrieve("r1")
+    assert payment.status is PaymentStatus.PENDING and payment.provider == "paystack"

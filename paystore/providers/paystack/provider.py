@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 from paystore.core.base_provider import BaseProvider
 from paystore.core.exceptions import PaymentError, ProviderError
 from paystore.core.http_client import HTTPClient
+from paystore.core.models import Subscription
+from paystore.core.subscriptions import parse_subscription
 
 
 class PaystackProvider(BaseProvider):
@@ -277,16 +279,37 @@ class PaystackProvider(BaseProvider):
         except Exception as e:
             raise ProviderError(f"Failed to create subscription: {e}") from e
 
+    def get_subscription(self, subscription_code: str) -> Subscription:
+        """Fetch a subscription by its subscription code."""
+        try:
+            response = self.client.get(
+                f"{self.BASE_URL}/subscription/{subscription_code}",
+                headers=self._get_headers(),
+            )
+            if not response.get("status"):
+                raise ProviderError(response.get("message", "Subscription not found"))
+            return parse_subscription("paystack", response.get("data", {}))
+        except PaymentError:
+            raise
+        except Exception as e:
+            raise ProviderError(f"Failed to get subscription: {e}") from e
+
     def cancel_subscription(
         self, subscription_code: str, **kwargs: Any
     ) -> Dict[str, Any]:
         """
         Cancel a Paystack subscription.
 
+        Paystack's disable never refunds or ends access early — the
+        subscription becomes "non-renewing" and simply isn't charged
+        again, so `at_period_end` is accepted and is always how this
+        behaves.
+
         Paystack's disable endpoint requires an email_token in addition
         to the subscription code, so this fetches the subscription first
         to retrieve it.
         """
+        kwargs.pop("at_period_end", None)
         try:
             subscription = self.client.get(
                 f"{self.BASE_URL}/subscription/{subscription_code}",

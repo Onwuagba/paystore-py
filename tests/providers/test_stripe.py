@@ -260,3 +260,127 @@ def test_verify_webhook_signature_requires_webhook_secret(stripe_config):
     provider = StripeProvider(stripe_config)
     with pytest.raises(ConfigurationError):
         provider.verify_webhook_signature(b"payload", "t=1,v1=abc")
+
+
+def _capture_post_form(provider, monkeypatch, response):
+    calls = []
+
+    def fake(url, data, headers):
+        calls.append((url, data))
+        return response
+
+    monkeypatch.setattr(provider.client, "post_form", fake)
+    return calls
+
+
+def test_create_subscription_supports_quantity_trial_and_tax(provider, monkeypatch):
+    calls = _capture_post_form(
+        provider, monkeypatch, {"id": "sub_1", "status": "trialing"}
+    )
+    result = provider.create_subscription(
+        "cus_1", "price_1", quantity=3, trial_days=14, automatic_tax=True
+    )
+    data = calls[0][1]
+    assert data["items[0][quantity]"] == 3
+    assert data["trial_period_days"] == 14
+    assert data["automatic_tax[enabled]"] == "true"
+    assert result["normalized_status"] == "trialing"
+
+
+def test_get_subscription_returns_normalized_model(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"id": "sub_1", "status": "past_due", "customer": "cus_1"},
+    )
+    sub = provider.get_subscription("sub_1")
+    assert sub.status.value == "past_due"
+    assert sub.customer_id == "cus_1"
+
+
+def test_cancel_at_period_end_posts_instead_of_deleting(provider, monkeypatch):
+    calls = _capture_post_form(
+        provider,
+        monkeypatch,
+        {"id": "sub_1", "status": "active", "cancel_at_period_end": True},
+    )
+    monkeypatch.setattr(
+        provider.client, "delete", lambda url, headers: pytest.fail("must not DELETE")
+    )
+    result = provider.cancel_subscription("sub_1", at_period_end=True)
+    assert calls[0][0].endswith("/subscriptions/sub_1")
+    assert calls[0][1]["cancel_at_period_end"] == "true"
+    assert result["success"] is True
+
+
+def test_resume_subscription_clears_cancel_at_period_end(provider, monkeypatch):
+    calls = _capture_post_form(
+        provider,
+        monkeypatch,
+        {"id": "sub_1", "status": "active", "cancel_at_period_end": False},
+    )
+    sub = provider.resume_subscription("sub_1")
+    assert calls[0][1]["cancel_at_period_end"] == "false"
+    assert sub.cancel_at_period_end is False
+
+
+def test_update_subscription_quantity_targets_first_item(provider, monkeypatch):
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"id": "sub_1", "items": {"data": [{"id": "si_9"}]}},
+    )
+    calls = _capture_post_form(
+        provider,
+        monkeypatch,
+        {
+            "id": "sub_1",
+            "status": "active",
+            "items": {"data": [{"id": "si_9", "quantity": 7}]},
+        },
+    )
+    sub = provider.update_subscription("sub_1", quantity=7, proration_behavior="none")
+    data = calls[0][1]
+    assert data["items[0][id]"] == "si_9"
+    assert data["items[0][quantity]"] == 7
+    assert data["proration_behavior"] == "none"
+    assert sub.quantity == 7
+
+
+def test_subscription_checkout_uses_subscription_mode(provider, monkeypatch):
+    calls = _capture_post_form(
+        provider, monkeypatch, {"id": "cs_1", "url": "https://checkout.stripe.com/x"}
+    )
+    result = provider.create_subscription_checkout(
+        "price_1", email="a@example.com", quantity=2, trial_days=7, automatic_tax=True
+    )
+    data = calls[0][1]
+    assert data["mode"] == "subscription"
+    assert data["line_items[0][price]"] == "price_1"
+    assert data["line_items[0][quantity]"] == 2
+    assert data["subscription_data[trial_period_days]"] == 7
+    assert data["customer_email"] == "a@example.com"
+    assert result["authorization_url"] == "https://checkout.stripe.com/x"
+
+
+def test_subscription_checkout_with_customer_omits_email(provider, monkeypatch):
+    calls = _capture_post_form(provider, monkeypatch, {"id": "cs_1", "url": "u"})
+    provider.create_subscription_checkout(
+        "price_1", email="a@example.com", customer="cus_1"
+    )
+    assert calls[0][1]["customer"] == "cus_1"
+    assert "customer_email" not in calls[0][1]
+
+
+def test_billing_portal_session(provider, monkeypatch):
+    calls = _capture_post_form(
+        provider, monkeypatch, {"id": "bps_1", "url": "https://billing.stripe.com/p"}
+    )
+    result = provider.create_billing_portal_session("cus_1", "https://app/return")
+    assert calls[0][0].endswith("/billing_portal/sessions")
+    assert calls[0][1] == {"customer": "cus_1", "return_url": "https://app/return"}
+    assert result["url"].startswith("https://billing")
+
+
+def test_no_payment_required_session_counts_as_success(provider):
+    assert provider._normalize_status("no_payment_required") == "success"

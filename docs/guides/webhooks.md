@@ -46,6 +46,10 @@ event = gateway.parse_webhook_event(raw_body, signature)  # raises PaymentError 
 print(event.event_type)  # e.g. "charge.success" (Paystack) / "checkout.session.completed" (Stripe)
 print(event.data)        # the normalized object — {"reference": ..., "status": ...} etc.
 print(event.raw)         # the full, unmodified parsed body — always available
+print(event.type)        # neutral name: "payment.succeeded", "subscription.canceled", ...
+print(event.id)          # provider event id for deduping (Stripe, PayPal; else None)
+print(event.created_at)  # aware datetime (Stripe, PayPal; else None)
+print(event.subscription)  # normalized Subscription on subscription.* events
 ```
 
 `AsyncGateway` has the same method (`await gateway.parse_webhook_event(...)`).
@@ -122,3 +126,16 @@ actually deliver webhooks to you:
 - **Paystack / Flutterwave / Remita**: use a tunnel (ngrok or similar)
   and register the public URL as the webhook endpoint in the
   provider's dashboard.
+
+### Neutral event types
+
+`event.type` is one of `payment.succeeded`, `payment.failed`,
+`refund.processed`, `checkout.completed`, `subscription.created`,
+`subscription.updated`, `subscription.canceled`, `invoice.paid`,
+`invoice.payment_failed`, or `"unknown"` for events paystore doesn't
+map (branch on `event.event_type` for those). PayPal events are
+normalized too (`event_type` from `event_type`, `data` from `resource`).
+
+For PayPal, `signature` must be the JSON of five headers; use
+`paystore.webhooks.headers.build_signature("paypal", get_header)` to
+build it from any framework's request.

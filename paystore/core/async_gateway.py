@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from paystore.core.config import Config
 from paystore.core.gateway import Gateway
+from paystore.core.models import Payment, Subscription
 
 if TYPE_CHECKING:
     from paystore.webhooks.events import WebhookEvent
@@ -53,6 +54,9 @@ class AsyncGateway:
 
     async def verify_payment(self, reference: str) -> Dict[str, Any]:
         return await _run_sync(self._gateway.payments.verify, reference)
+
+    async def retrieve_payment(self, reference: str) -> Payment:
+        return await _run_sync(self._gateway.payments.retrieve, reference)
 
     async def charge_authorization(
         self,
@@ -139,10 +143,47 @@ class AsyncGateway:
         )
 
     async def cancel_subscription(
-        self, subscription_code: str, **kwargs: Any
+        self, subscription_code: str, at_period_end: bool = False, **kwargs: Any
     ) -> Dict[str, Any]:
         return await _run_sync(
-            self._gateway.subscriptions.cancel, subscription_code, **kwargs
+            self._gateway.subscriptions.cancel,
+            subscription_code,
+            at_period_end=at_period_end,
+            **kwargs,
+        )
+
+    async def get_subscription(self, subscription_code: str) -> Subscription:
+        return await _run_sync(self._gateway.subscriptions.get, subscription_code)
+
+    async def resume_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Subscription:
+        return await _run_sync(
+            self._gateway.subscriptions.resume, subscription_code, **kwargs
+        )
+
+    async def update_subscription(
+        self, subscription_code: str, quantity: Optional[int] = None, **kwargs: Any
+    ) -> Subscription:
+        return await _run_sync(
+            self._gateway.subscriptions.update,
+            subscription_code,
+            quantity=quantity,
+            **kwargs,
+        )
+
+    async def subscription_checkout(
+        self, plan: str, email: Optional[str] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        return await _run_sync(
+            self._gateway.subscriptions.checkout, plan, email=email, **kwargs
+        )
+
+    async def billing_portal(
+        self, customer: str, return_url: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        return await _run_sync(
+            self._gateway.subscriptions.portal, customer, return_url, **kwargs
         )
 
     async def verify_webhook(self, payload: bytes, signature: str) -> bool:

@@ -95,7 +95,9 @@ gateway = Gateway(
 | Customer management (`gateway.customers`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | List/deactivate saved cards (`gateway.tokens`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | Refunds (`gateway.payments.refund`) | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
-| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Recurring billing (`gateway.subscriptions`) | ✅ | ❌ | ✅ | ❌ | ⚠️ unverified | ❌ |
+| Subscription get/resume/update, hosted checkout | ➖ (get only) | ❌ | ✅ | ❌ | ⚠️ unverified | ❌ |
+| Billing portal (`subscriptions.portal`) | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | Transfers/payouts (`gateway.transfers`) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Split payments (`gateway.subaccounts`) | ✅ | ✅ | ➖ (passthrough kwargs) | ❌ | ❌ | ❌ |
 

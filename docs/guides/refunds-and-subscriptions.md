@@ -30,7 +30,7 @@ else:
 Two options, depending on how much you want the provider to manage
 for you:
 
-### Option 1: Native plans/subscriptions (Paystack, Stripe)
+### Option 1: Native plans/subscriptions (Paystack, Stripe, PayPal)
 
 Wraps the provider's own Plan/Subscription objects, so retries,
 dunning, and proration are handled by the provider, not your code:
@@ -50,6 +50,53 @@ subscription = gateway.subscriptions.subscribe(
 gateway.subscriptions.cancel(subscription["subscription_code"])
 ```
 
+#### Managing a subscription
+
+`get`, `resume` and `update` return a normalized `Subscription`
+(`status` is a `SubscriptionStatus`: `trialing`, `active`, `past_due`,
+`unpaid`, `paused`, `incomplete`, `canceled`, `expired`; the provider's
+own object is in `.raw`):
+
+```python
+sub = gateway.subscriptions.get("sub_123")
+if sub.status.value == "past_due": ...
+
+gateway.subscriptions.cancel("sub_123", at_period_end=True)  # keep access until paid period ends
+gateway.subscriptions.resume("sub_123")                      # undo it before then
+gateway.subscriptions.update("sub_123", quantity=10)         # seats
+```
+
+Hosted signup (collects the payment method for you) and the customer
+billing portal:
+
+```python
+session = gateway.subscriptions.checkout(
+    plan="price_123", email="a@example.com", quantity=5,
+    trial_days=14, automatic_tax=True,       # Stripe
+    success_url="https://app/ok", cancel_url="https://app/no",
+)
+redirect(session["authorization_url"])
+
+portal = gateway.subscriptions.portal(customer="cus_123", return_url="https://app/account")
+redirect(portal["url"])                      # Stripe only
+```
+
+| | Stripe | PayPal ⚠️ | Paystack |
+|---|---|---|---|
+| `get` | ✅ | ✅ | ✅ |
+| `cancel(at_period_end=True)` | ✅ | ❌ raises | ✅ (always) |
+| `resume` | ✅ undo pending cancel | ✅ reactivate suspended | ❌ |
+| `update(quantity=)` | ✅ | ✅ (needs `quantity_supported` plan; may need re-approval) | ❌ |
+| `checkout` | ✅ Checkout `mode=subscription` | ✅ approval link | ❌ |
+| `portal` | ✅ | ❌ | ❌ |
+| Trials | `trial_days` | `create_plan(trial_days=)` | via plan |
+| Tax | `automatic_tax=True` | `create_plan(tax_percentage=)` | ❌ |
+
+PayPal Subscriptions were written from PayPal's docs and are **not
+verified against a live account**. PayPal subscriptions are approved by
+the customer at PayPal, so `subscribe` returns an `authorization_url`
+and the subscription stays `incomplete` until they approve.
+
 `interval` is passed straight through to the provider, unmodified —
 values are provider-specific:
 
@@ -57,6 +104,7 @@ values are provider-specific:
 |---|---|
 | Paystack | `"hourly"`, `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"biannually"`, `"annually"` |
 | Stripe | `"day"`, `"week"`, `"month"`, `"year"` |
+| PayPal | `"day"`, `"week"`, `"month"`, `"year"` |
 
 Flutterwave and Remita don't implement `gateway.subscriptions` —
 Flutterwave's model attaches a `payment_plan` directly to

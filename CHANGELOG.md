@@ -5,6 +5,29 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-19
+
+### Added
+- Normalized `Subscription` / `SubscriptionStatus` models (also exported
+  from `paystore`) for Stripe, PayPal and Paystack.
+- `gateway.subscriptions.get/resume/update/checkout/portal` and
+  `cancel(at_period_end=True)`.
+- Stripe: cancel at period end, resume, seat quantity, trial days,
+  automatic tax, hosted subscription Checkout and billing portal.
+- PayPal Subscriptions: `create_plan` (trials, tax), approval-link
+  subscribe, get/cancel/resume/revise quantity. Unverified against a
+  live account.
+- `WebhookEvent.type` (neutral event name), `.id`, `.created_at` and
+  `.subscription`; PayPal events are now parsed.
+- `paystore.webhooks.headers.build_signature()` (handles PayPal's
+  five-header signature).
+- `Payment` / `PaymentStatus` models and `gateway.payments.retrieve()`
+  (typed counterpart of `verify`).
+
+### Changed
+- Development status classifier raised from Alpha to Beta. PayPal, Remita
+  and MoMo remain unverified against live accounts.
+
 ## [0.3.0] - 2026-09-22
 
 ### Added

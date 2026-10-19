@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 from paystore.core.base_provider import BaseProvider
 from paystore.core.config import Config
 from paystore.core.exceptions import ConfigurationError
+from paystore.core.models import Payment, Subscription
 from paystore.security.validation import validate_amount, validate_email
 from paystore.storage.base import BaseStorage, NoOpStorage
 
@@ -246,7 +247,8 @@ class Gateway:
 
         Args:
             feature: one of "charge_authorization", "customers", "tokens",
-                "refunds", "subscriptions", "transfers",
+                "refunds", "subscriptions", "subscription_management",
+                "subscription_checkout", "billing_portal", "transfers",
                 "split_payments". initialize/verify/webhook
                 verification are supported by every provider and aren't
                 part of this check.
@@ -338,9 +340,55 @@ class SubscriptionOperations:
             customer=customer, plan=plan, **kwargs
         )
 
-    def cancel(self, subscription_code: str, **kwargs: Any) -> Dict[str, Any]:
-        """Cancel a subscription."""
+    def cancel(
+        self, subscription_code: str, at_period_end: bool = False, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Cancel a subscription — immediately, or with at_period_end=True
+        when it should stay live until the paid period ends (Stripe;
+        Paystack always behaves this way; PayPal raises
+        NotImplementedError).
+        """
+        if at_period_end:
+            kwargs["at_period_end"] = True
         return self._provider.cancel_subscription(subscription_code, **kwargs)
+
+    def get(self, subscription_code: str) -> Subscription:
+        """Fetch a subscription as a normalized Subscription."""
+        return self._provider.get_subscription(subscription_code)
+
+    def resume(self, subscription_code: str, **kwargs: Any) -> Subscription:
+        """Undo a pending cancel-at-period-end (Stripe) or reactivate (PayPal)."""
+        return self._provider.resume_subscription(subscription_code, **kwargs)
+
+    def update(
+        self, subscription_code: str, quantity: Optional[int] = None, **kwargs: Any
+    ) -> Subscription:
+        """Change a subscription, e.g. its seat `quantity`."""
+        return self._provider.update_subscription(
+            subscription_code, quantity=quantity, **kwargs
+        )
+
+    def checkout(
+        self, plan: str, email: Optional[str] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Start a hosted subscription signup. Redirect the customer to
+        the returned `authorization_url`. Common kwargs: `quantity`,
+        `trial_days` (Stripe), `automatic_tax` (Stripe), `success_url`/
+        `cancel_url` (Stripe) or `return_url`/`cancel_url` (PayPal).
+        """
+        if email:
+            validate_email(email)
+        return self._provider.create_subscription_checkout(
+            plan=plan, email=email, **kwargs
+        )
+
+    def portal(self, customer: str, return_url: str, **kwargs: Any) -> Dict[str, Any]:
+        """Create a self-service billing portal session; redirect to `url`."""
+        return self._provider.create_billing_portal_session(
+            customer=customer, return_url=return_url, **kwargs
+        )
 
 
 class TransferOperations:
@@ -454,6 +502,10 @@ class PaymentOperations:
         result = self._provider.verify_payment(reference)
         self._storage.save_transaction(result)
         return result
+
+    def retrieve(self, reference: str) -> Payment:
+        """Like verify, but returns a typed Payment with a PaymentStatus."""
+        return Payment.from_raw(self._provider.config.provider, self.verify(reference))
 
     def charge_authorization(
         self,

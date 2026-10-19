@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, FrozenSet, List, Optional
 
 from paystore.core.config import Config
+from paystore.core.models import Subscription
 
 
 class BaseProvider(ABC):
@@ -22,7 +23,8 @@ class BaseProvider(ABC):
     """
     Which optional features this provider implements. Valid values:
     "charge_authorization", "customers", "tokens", "refunds",
-    "subscriptions", "transfers", "split_payments". A provider that
+    "subscriptions", "subscription_management", "subscription_checkout",
+    "billing_portal", "transfers", "split_payments". A provider that
     doesn't include a feature here should still override its methods to
     raise NotImplementedError with
     a clear message (see the defaults below) — SUPPORTED_FEATURES is
@@ -147,9 +149,59 @@ class BaseProvider(ABC):
     def cancel_subscription(
         self, subscription_code: str, **kwargs: Any
     ) -> Dict[str, Any]:
-        """Cancel a subscription (optional implementation)."""
+        """
+        Cancel a subscription (optional implementation). Pass
+        `at_period_end=True` to keep it live until the paid period ends.
+        """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support subscriptions"
+        )
+
+    def get_subscription(self, subscription_code: str) -> Subscription:
+        """Fetch a subscription (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support reading subscriptions"
+        )
+
+    def resume_subscription(
+        self, subscription_code: str, **kwargs: Any
+    ) -> Subscription:
+        """
+        Undo a pending cancellation, or reactivate a suspended
+        subscription (optional implementation).
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support resuming subscriptions"
+        )
+
+    def update_subscription(
+        self, subscription_code: str, quantity: Optional[int] = None, **kwargs: Any
+    ) -> Subscription:
+        """Change a subscription, e.g. its seat quantity (optional implementation)."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support updating subscriptions"
+        )
+
+    def create_subscription_checkout(
+        self, plan: str, email: Optional[str] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Start a hosted subscription signup (optional implementation).
+        Returns a dict with `authorization_url` to redirect the customer to.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support hosted subscription checkout"
+        )
+
+    def create_billing_portal_session(
+        self, customer: str, return_url: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        Create a customer self-service billing portal session (optional
+        implementation). Returns a dict with `url`.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support a billing portal"
         )
 
     def create_transfer_recipient(

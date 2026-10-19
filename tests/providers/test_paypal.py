@@ -211,3 +211,136 @@ def test_verify_webhook_signature_invalid(provider, monkeypatch):
         }
     )
     assert provider.verify_webhook_signature(b'{"id": "evt_1"}', signature) is False
+
+
+def _post_recorder(provider, monkeypatch, responses):
+    """Record POSTs; `responses` maps a URL suffix to its JSON response."""
+    _mock_token_response(monkeypatch, provider)
+    calls = []
+
+    def fake_post(url, data, headers):
+        calls.append((url, data))
+        for suffix, response in responses.items():
+            if url.endswith(suffix):
+                return response
+        return {}
+
+    monkeypatch.setattr(provider.client, "post", fake_post)
+    return calls
+
+
+def test_create_plan_builds_product_and_plan_with_trial_and_tax(provider, monkeypatch):
+    calls = _post_recorder(
+        provider,
+        monkeypatch,
+        {"/v1/catalogs/products": {"id": "PROD_1"}, "/v1/billing/plans": {"id": "P-1"}},
+    )
+    result = provider.create_plan(
+        "Pro",
+        1000,
+        "month",
+        currency="USD",
+        trial_days=7,
+        tax_percentage="7.5",
+        quantity_supported=True,
+    )
+    body = calls[1][1]
+    assert body["product_id"] == "PROD_1"
+    trial, regular = body["billing_cycles"]
+    assert trial["tenure_type"] == "TRIAL" and trial["total_cycles"] == 1
+    assert trial["frequency"] == {"interval_unit": "DAY", "interval_count": 7}
+    assert regular["sequence"] == 2 and regular["total_cycles"] == 0
+    assert regular["frequency"]["interval_unit"] == "MONTH"
+    assert regular["pricing_scheme"]["fixed_price"] == {
+        "value": "10.00",
+        "currency_code": "USD",
+    }
+    assert body["taxes"] == {"percentage": "7.5", "inclusive": False}
+    assert body["quantity_supported"] is True
+    assert result["plan_code"] == "P-1"
+
+
+def test_create_plan_rejects_unknown_interval(provider):
+    with pytest.raises(ProviderError, match="interval"):
+        provider.create_plan("Pro", 1000, "fortnight", currency="USD")
+
+
+def test_subscription_checkout_returns_approval_link(provider, monkeypatch):
+    calls = _post_recorder(
+        provider,
+        monkeypatch,
+        {
+            "/v1/billing/subscriptions": {
+                "id": "I-1",
+                "status": "APPROVAL_PENDING",
+                "links": [{"rel": "approve", "href": "https://paypal.com/approve"}],
+            }
+        },
+    )
+    result = provider.create_subscription_checkout(
+        "P-1", email="a@example.com", quantity=2
+    )
+    body = calls[0][1]
+    assert body["plan_id"] == "P-1" and body["quantity"] == "2"
+    assert body["subscriber"] == {"email_address": "a@example.com"}
+    assert result["authorization_url"] == "https://paypal.com/approve"
+    assert result["subscription_code"] == "I-1"
+    assert result["normalized_status"] == "incomplete"
+
+
+def test_get_subscription_returns_normalized_model(provider, monkeypatch):
+    _mock_token_response(monkeypatch, provider)
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"id": "I-1", "status": "ACTIVE", "plan_id": "P-1"},
+    )
+    sub = provider.get_subscription("I-1")
+    assert sub.status.value == "active" and sub.plan_id == "P-1"
+
+
+def test_cancel_subscription_posts_cancel(provider, monkeypatch):
+    calls = _post_recorder(provider, monkeypatch, {})
+    result = provider.cancel_subscription("I-1", reason="bye")
+    assert calls[0][0].endswith("/v1/billing/subscriptions/I-1/cancel")
+    assert calls[0][1] == {"reason": "bye"}
+    assert result["success"] is True
+
+
+def test_cancel_at_period_end_not_supported(provider):
+    with pytest.raises(NotImplementedError):
+        provider.cancel_subscription("I-1", at_period_end=True)
+
+
+def test_resume_subscription_activates_then_fetches(provider, monkeypatch):
+    calls = _post_recorder(provider, monkeypatch, {})
+    monkeypatch.setattr(
+        provider.client, "get", lambda url, headers: {"id": "I-1", "status": "ACTIVE"}
+    )
+    sub = provider.resume_subscription("I-1")
+    assert calls[0][0].endswith("/I-1/activate")
+    assert sub.status.value == "active"
+
+
+def test_update_subscription_revises_quantity(provider, monkeypatch):
+    calls = _post_recorder(
+        provider, monkeypatch, {"/revise": {"links": [{"rel": "approve", "href": "h"}]}}
+    )
+    monkeypatch.setattr(
+        provider.client,
+        "get",
+        lambda url, headers: {"id": "I-1", "status": "ACTIVE", "quantity": "4"},
+    )
+    sub = provider.update_subscription("I-1", quantity=4)
+    assert calls[0][1] == {"quantity": "4"}
+    assert sub.quantity == 4
+    assert sub.raw["revise_links"][0]["href"] == "h"
+
+
+def test_billing_portal_not_supported(provider):
+    with pytest.raises(NotImplementedError):
+        provider.create_billing_portal_session("cus", "https://x")
+
+
+def test_supported_features_include_subscriptions(provider):
+    assert {"subscriptions", "subscription_checkout"} <= provider.SUPPORTED_FEATURES
