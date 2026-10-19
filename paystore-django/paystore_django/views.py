@@ -8,7 +8,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from paystore.core.exceptions import PaymentError
-from paystore.webhooks.headers import SIGNATURE_HEADERS
+from paystore.webhooks.headers import build_signature
 
 from paystore_django.gateway import get_async_gateway, get_gateway
 from paystore_django.signals import webhook_verified
@@ -22,10 +22,11 @@ def _to_wsgi_meta_key(header_name: str) -> str:
 def _extract_signature(
     request: HttpRequest, provider: str, signature_header_override: Optional[str]
 ) -> str:
-    header_name = signature_header_override or SIGNATURE_HEADERS.get(provider.lower())
-    if not header_name:
-        return ""
-    return request.META.get(_to_wsgi_meta_key(header_name), "")
+    if signature_header_override:
+        return request.META.get(_to_wsgi_meta_key(signature_header_override), "")
+    return build_signature(
+        provider, lambda header: request.META.get(_to_wsgi_meta_key(header))
+    )
 
 
 def _parse_event_body(request: HttpRequest) -> Dict[str, Any]:
